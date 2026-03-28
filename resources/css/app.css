@@ -1,0 +1,36 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/forms';
+
+/* Typography Improvements */
+@layer base {
+    body {
+        @apply leading-relaxed tracking-normal;
+        font-feature-settings: 'kern' 1, 'liga' 1;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    a {
+        @apply transition-colors duration-200;
+    }
+}
+
+[x-cloak] { display: none !important; }
+
+/* Taille globale des inputs, selects et boutons filtres */
+@layer components {
+    select, input[type="text"], input[type="number"], input[type="email"],
+    input[type="date"], input[type="search"], textarea {
+        min-height: 42px;
+        font-size: 14px;
+    }
+
+    button[type="submit"], a.px-4, a.px-6 {
+        min-height: 42px;
+    }
+
+    /* Stat boxes plus grands */
+    .rounded-xl.p-4 {
+        padding: 1.25rem;
+    }
+}
