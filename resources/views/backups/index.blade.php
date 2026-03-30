@@ -154,15 +154,11 @@
                                     </td>
                                     <td class="px-6 py-4 text-right space-x-2 flex justify-end">
                                         <!-- Restaurer -->
-                                        <form method="POST" action="{{ route('backups.restore') }}" class="inline"
-                                              onsubmit="return confirm('⚠️ Êtes-vous certain de vouloir restaurer cette sauvegarde?\n\nUne sauvegarde de sécurité sera créée avant la restauration.');">
-                                            @csrf
-                                            <input type="hidden" name="backup" value="{{ $backup['name'] }}">
-                                            <button type="submit" title="Restaurer cette sauvegarde"
-                                                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded transition text-sm">
-                                                ↩️ Restaurer
-                                            </button>
-                                        </form>
+                                        <button type="button"
+                                                onclick="ouvrirModalRestauration('{{ $backup['name'] }}')"
+                                                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-3 py-2 rounded transition text-sm">
+                                            ↩️ Restaurer
+                                        </button>
 
                                         <!-- Télécharger -->
                                         <form method="POST" action="{{ route('backups.download') }}" class="inline">
@@ -216,4 +212,52 @@
         animation: pulse 2s infinite;
     }
 </style>
+
+{{-- Modal confirmation restauration --}}
+<div id="modal-restauration" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 hidden">
+    <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+        <h3 class="text-lg font-bold text-gray-900 mb-1">⚠️ Confirmer la restauration</h3>
+        <p class="text-sm text-gray-600 mb-4">
+            Cette action remplace toute la base de données. Une sauvegarde de sécurité sera créée automatiquement avant.<br>
+            <strong>Confirmez votre mot de passe pour continuer.</strong>
+        </p>
+
+        <form method="POST" action="{{ route('backups.restore') }}" id="form-restauration">
+            @csrf
+            <input type="hidden" name="backup" id="modal-backup-name">
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Votre mot de passe</label>
+                <input type="password" name="password" required autofocus
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       placeholder="Entrez votre mot de passe">
+            </div>
+
+            <div class="flex gap-3 justify-end">
+                <button type="button" onclick="fermerModalRestauration()"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
+                    Annuler
+                </button>
+                <button type="submit"
+                        class="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition">
+                    Confirmer la restauration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function ouvrirModalRestauration(filename) {
+    document.getElementById('modal-backup-name').value = filename;
+    document.getElementById('modal-restauration').classList.remove('hidden');
+}
+function fermerModalRestauration() {
+    document.getElementById('modal-restauration').classList.add('hidden');
+    document.getElementById('form-restauration').querySelector('input[type=password]').value = '';
+}
+document.getElementById('modal-restauration').addEventListener('click', function(e) {
+    if (e.target === this) fermerModalRestauration();
+});
+</script>
 @endsection

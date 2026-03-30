@@ -18,13 +18,21 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // Admin
+        // Admin — mot de passe via .env (ADMIN_SEED_PASSWORD) ou généré aléatoirement
+        $adminPassword = env('ADMIN_SEED_PASSWORD');
+        if (!$adminPassword) {
+            $adminPassword = bin2hex(random_bytes(12));
+            $this->command->warn("⚠️  ADMIN_SEED_PASSWORD non défini dans .env");
+            $this->command->warn("   Mot de passe généré : {$adminPassword}");
+            $this->command->warn("   Changez-le immédiatement via Paramètres > Mot de passe !");
+        }
+
         User::updateOrCreate(
             ['email' => 'admin@school.local'],
             [
                 'name'     => 'Administrateur',
                 'email'    => 'admin@school.local',
-                'password' => Hash::make('admin123'),
+                'password' => Hash::make($adminPassword),
             ]
         );
 
@@ -170,6 +178,6 @@ class DatabaseSeeder extends Seeder
         }
 
         $this->command->info('Base de donnees remplie avec succes !');
-        $this->command->info('Connexion : admin@school.local / admin123');
+        $this->command->info('Connexion : admin@school.local');
     }
 }

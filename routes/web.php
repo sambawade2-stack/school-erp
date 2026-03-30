@@ -139,10 +139,10 @@ Route::middleware('auth')->group(function () {
     // Sauvegardes de base de données
     Route::prefix('backups')->name('backups.')->group(function () {
         Route::get('/',          [BackupController::class, 'index'])->name('index');
-        Route::post('/create',   [BackupController::class, 'create'])->name('create');
-        Route::post('/restore',  [BackupController::class, 'restore'])->name('restore');
-        Route::post('/delete',   [BackupController::class, 'delete'])->name('delete');
-        Route::post('/download', [BackupController::class, 'download'])->name('download');
+        Route::post('/create',   [BackupController::class, 'create'])->name('create')->middleware('throttle:3,1');
+        Route::post('/restore',  [BackupController::class, 'restore'])->name('restore')->middleware('throttle:2,5');
+        Route::post('/delete',   [BackupController::class, 'delete'])->name('delete')->middleware('throttle:5,1');
+        Route::post('/download', [BackupController::class, 'download'])->name('download')->middleware('throttle:5,1');
     });
 
     // Administration

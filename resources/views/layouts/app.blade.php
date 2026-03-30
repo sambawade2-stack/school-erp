@@ -8,11 +8,48 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@600;700;800&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+
+    {{-- Tailwind CSS CDN --}}
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'Segoe UI', 'system-ui', '-apple-system', 'sans-serif'],
+                        heading: ['Poppins', 'Segoe UI Semibold', 'Segoe UI', 'system-ui', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    {{-- Alpine.js CDN --}}
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+
     <style>
         * { font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif; }
-        h1, h2, h3, h4, h5, h6 { font-family: 'Poppins', 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif; }
-        .font-heading { font-family: 'Poppins', 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif; }
+        h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Poppins', 'Segoe UI Semibold', 'Segoe UI', system-ui, sans-serif; }
+
+        /* Alpine x-cloak */
+        [x-cloak] { display: none !important; }
+
+        /* Inputs & boutons */
+        select,
+        input[type="text"],
+        input[type="number"],
+        input[type="email"],
+        input[type="date"],
+        input[type="search"],
+        textarea { min-height: 42px; font-size: 14px; }
+
+        /* Scrollbar sidebar */
+        .sidebar-scroll { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent; }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+        /* Transitions fluides */
+        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
     </style>
 </head>
 <body class="bg-gray-50 font-sans antialiased text-gray-900" style="font-feature-settings: 'kern' 1;">
@@ -72,7 +109,7 @@
         </div>
         @endif
 
-        <nav class="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto" style="scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.15) transparent;">
+        <nav class="sidebar-scroll flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
             @php
             $liens = [
                 ['route' => 'dashboard',        'label' => 'Dashboard',       'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],

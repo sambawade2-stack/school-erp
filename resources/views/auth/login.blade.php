@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>School ERP - Connexion</title>
-    @vite(['resources/css/app.css'])
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
 </head>
 <body class="bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 min-h-screen flex items-center justify-center">
 
