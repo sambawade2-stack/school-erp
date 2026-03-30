@@ -45,13 +45,19 @@ class BackupController extends Controller
     }
 
     /**
-     * Restaurer une sauvegarde
+     * Restaurer une sauvegarde (nécessite confirmation du mot de passe)
      */
     public function restore(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'backup' => 'required|string|max:255',
+            'backup'   => 'required|string|max:255',
+            'password' => 'required|string',
         ]);
+
+        if (!\Illuminate\Support\Facades\Hash::check($validated['password'], auth()->user()->password)) {
+            return redirect()->route('backups.index')
+                ->with('error', '❌ Mot de passe incorrect. Restauration annulée.');
+        }
 
         $result = $this->backupService->restore($validated['backup']);
 
