@@ -161,16 +161,29 @@ class DatabaseSeeder extends Seeder
         // ── Utilisateur admin ──────────────────────────────────────────────────
         $adminRole = Role::where('slug', 'admin')->first();
 
-        User::updateOrCreate(
-            ['email' => 'admin@school.local'],
-            [
+        $adminUser = User::where('email', 'admin@school.local')->first();
+        if ($adminUser) {
+            // Ne réinitialise PAS le mot de passe si l'utilisateur existe déjà
+            $adminUser->update(['name' => 'Administrateur', 'role_id' => $adminRole->id]);
+        } else {
+            User::create([
+                'email'    => 'admin@school.local',
                 'name'     => 'Administrateur',
                 'password' => Hash::make($adminPassword),
                 'role_id'  => $adminRole->id,
-            ]
-        );
+            ]);
+            $this->command->info("Admin créé — mot de passe : {$adminPassword}");
+        }
 
-        $this->command->info('Base de données initialisée avec succès !');
-        $this->command->info('Connexion : admin@school.local');
+        // ── Assigner le rôle admin aux utilisateurs sans rôle ─────────────────
+        // (migration RBAC ajoutée sur un système existant : role_id = NULL)
+        $sansRole = User::whereNull('role_id')->where('email', '!=', 'admin@school.local')->count();
+        if ($sansRole > 0) {
+            $this->command->warn("{$sansRole} utilisateur(s) sans rôle trouvé(s).");
+            $this->command->warn("Utilisez : php artisan rbac:assign-role");
+        }
+
+        $this->command->info('RBAC initialisé avec succès.');
+        $this->command->info('Admin : admin@school.local');
     }
 }
