@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AnneeScolaire;
+use App\Models\Classe;
 use Illuminate\Http\Request;
 
 class AnneeScolaireController extends Controller
@@ -11,7 +12,13 @@ class AnneeScolaireController extends Controller
     {
         $annees = AnneeScolaire::orderByDesc('date_debut')->get();
         $active = AnneeScolaire::active();
-        return view('admin.annees.index', compact('annees', 'active'));
+
+        // Nombre de classes et d'élèves actifs par année
+        $statsParAnnee = Classe::selectRaw('annee_scolaire, COUNT(*) as nb_classes')
+            ->groupBy('annee_scolaire')
+            ->pluck('nb_classes', 'annee_scolaire');
+
+        return view('admin.annees.index', compact('annees', 'active', 'statsParAnnee'));
     }
 
     public function store(Request $request)
@@ -81,6 +88,57 @@ class AnneeScolaireController extends Controller
             : "Bulletins fermés pour {$annee->libelle}.";
 
         return redirect()->route('admin.annees.index')->with('succes', $msg);
+    }
+
+    /**
+     * Clone la structure des classes (et leurs matières associées) d'une année source vers cette année cible.
+     * Les élèves ne sont pas transférés — ils doivent être inscrits manuellement dans la nouvelle année.
+     */
+    public function initialiser(Request $request, AnneeScolaire $annee)
+    {
+        $request->validate([
+            'source_libelle' => 'required|exists:annees_scolaires,libelle',
+        ]);
+
+        $sourceLibelle = $request->source_libelle;
+        $classesSources = Classe::where('annee_scolaire', $sourceLibelle)
+            ->with('matieres')
+            ->get();
+
+        if ($classesSources->isEmpty()) {
+            return back()->with('error', "Aucune classe trouvée pour l'année {$sourceLibelle}.");
+        }
+
+        $nbClassesCrees = 0;
+        $classeMap = [];
+
+        foreach ($classesSources as $source) {
+            // Créer la classe dans la nouvelle année si elle n'existe pas déjà
+            $nouvelle = Classe::firstOrCreate(
+                ['nom' => $source->nom, 'annee_scolaire' => $annee->libelle],
+                [
+                    'niveau'       => $source->niveau,
+                    'categorie'    => $source->categorie,
+                    'capacite'     => $source->capacite,
+                    'description'  => $source->description,
+                    'enseignant_id'=> $source->enseignant_id,
+                ]
+            );
+
+            if ($nouvelle->wasRecentlyCreated) {
+                $nbClassesCrees++;
+                // Copier les associations matières
+                $nouvelle->matieres()->syncWithoutDetaching(
+                    $source->matieres->pluck('id')->toArray()
+                );
+            }
+
+            $classeMap[$source->id] = $nouvelle->id;
+        }
+
+        $msg = "{$nbClassesCrees} classe(s) créée(s) pour {$annee->libelle} avec leurs matières associées.";
+
+        return back()->with('succes', $msg);
     }
 
     /** Met à jour la période active (T1/T2/T3 pour collège/lycée, S1/S2/S3 pour élémentaire). */

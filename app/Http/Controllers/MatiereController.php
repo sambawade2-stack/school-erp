@@ -11,54 +11,65 @@ class MatiereController extends Controller
 {
     public function index()
     {
-        $matieres = Matiere::with(['enseignant', 'classe'])->orderBy('nom')->paginate(15);
+        $matieres = Matiere::with(['enseignant', 'classes'])->orderBy('nom')->paginate(15);
         return view('matieres.index', compact('matieres'));
     }
 
     public function create()
     {
         $enseignants = Enseignant::where('statut', 'actif')->orderBy('nom')->get();
-        $classes     = Classe::orderBy('nom')->get();
+        $classes     = Classe::orderBy('nom')->get()->groupBy('categorie');
         return view('matieres.create', compact('enseignants', 'classes'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nom'          => 'required|string|max:100',
-            'code'         => 'nullable|string|max:20',
-            'coefficient'  => 'required|numeric|min:0.5',
-            'niveau'       => 'nullable|string|max:50',
-            'section'      => 'nullable|string|max:100',
-            'enseignant_id'=> 'nullable|exists:enseignants,id',
-            'classe_id'    => 'nullable|exists:classes,id',
+            'nom'           => 'required|string|max:100',
+            'code'          => 'nullable|string|max:20',
+            'coefficient'   => 'required|numeric|min:0.5',
+            'niveau'        => 'nullable|string|max:50',
+            'section'       => 'nullable|string|max:100',
+            'enseignant_id' => 'nullable|exists:enseignants,id',
+            'classe_ids'    => 'nullable|array',
+            'classe_ids.*'  => 'exists:classes,id',
         ]);
 
-        Matiere::create($data);
+        $classeIds = $request->input('classe_ids', []);
+        unset($data['classe_ids']);
+
+        $matiere = Matiere::create($data);
+        $matiere->classes()->sync($classeIds);
 
         return redirect()->route('matieres.index')->with('succes', 'Matière créée avec succès.');
     }
 
     public function edit(Matiere $matiere)
     {
-        $enseignants = Enseignant::where('statut', 'actif')->orderBy('nom')->get();
-        $classes     = Classe::orderBy('nom')->get();
-        return view('matieres.edit', compact('matiere', 'enseignants', 'classes'));
+        $enseignants      = Enseignant::where('statut', 'actif')->orderBy('nom')->get();
+        $classes          = Classe::orderBy('nom')->get()->groupBy('categorie');
+        $classeIdsActuels = $matiere->classes->pluck('id')->toArray();
+        return view('matieres.edit', compact('matiere', 'enseignants', 'classes', 'classeIdsActuels'));
     }
 
     public function update(Request $request, Matiere $matiere)
     {
         $data = $request->validate([
-            'nom'          => 'required|string|max:100',
-            'code'         => 'nullable|string|max:20',
-            'coefficient'  => 'required|numeric|min:0.5',
-            'niveau'       => 'nullable|string|max:50',
-            'section'      => 'nullable|string|max:100',
-            'enseignant_id'=> 'nullable|exists:enseignants,id',
-            'classe_id'    => 'nullable|exists:classes,id',
+            'nom'           => 'required|string|max:100',
+            'code'          => 'nullable|string|max:20',
+            'coefficient'   => 'required|numeric|min:0.5',
+            'niveau'        => 'nullable|string|max:50',
+            'section'       => 'nullable|string|max:100',
+            'enseignant_id' => 'nullable|exists:enseignants,id',
+            'classe_ids'    => 'nullable|array',
+            'classe_ids.*'  => 'exists:classes,id',
         ]);
 
+        $classeIds = $request->input('classe_ids', []);
+        unset($data['classe_ids']);
+
         $matiere->update($data);
+        $matiere->classes()->sync($classeIds);
 
         return redirect()->route('matieres.index')->with('succes', 'Matière modifiée.');
     }

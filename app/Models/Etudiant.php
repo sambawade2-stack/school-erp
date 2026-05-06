@@ -14,7 +14,7 @@ class Etudiant extends Model
     protected $fillable = [
         'matricule', 'prenom', 'nom', 'date_naissance', 'sexe',
         'photo', 'adresse', 'telephone', 'nom_parent', 'tel_parent',
-        'classe_id', 'date_inscription', 'statut',
+        'classe_id', 'date_inscription', 'statut', 'regime_paiement',
     ];
 
     protected $casts = [

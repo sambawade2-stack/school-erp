@@ -38,7 +38,13 @@
                 <td class="px-5 py-3 text-gray-500 font-mono text-xs">{{ $matiere->code ?? '—' }}</td>
                 <td class="px-5 py-3 text-gray-600">{{ $matiere->coefficient }}</td>
                 <td class="px-5 py-3 text-gray-500">{{ $matiere->enseignant?->nom_complet ?? '—' }}</td>
-                <td class="px-5 py-3 text-gray-500">{{ $matiere->classe?->nom ?? '—' }}</td>
+                <td class="px-5 py-3 text-gray-500">
+                    @forelse($matiere->classes as $cl)
+                        <span class="inline-block text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 mr-0.5">{{ $cl->nom }}</span>
+                    @empty
+                        <span class="text-gray-300 text-xs italic">Toutes</span>
+                    @endforelse
+                </td>
                 <td class="px-5 py-3">
                     <div class="flex gap-2">
                         <a href="{{ route('matieres.edit', $matiere) }}" class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg">

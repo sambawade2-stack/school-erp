@@ -19,6 +19,10 @@
         Années scolaires
         @if($anneeActive)<span class="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-semibold">{{ $anneeActive->libelle }}</span>@else<span class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-semibold">!</span>@endif
     </a>
+    <a href="{{ route('admin.users.index') }}" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Utilisateurs
+    </a>
 </div>
 
 <div class="grid grid-cols-3 gap-5">
@@ -177,7 +181,60 @@
                             </button>
                         </form>
                         @endif
+
+                        {{-- Bouton initialiser (transition d'année) --}}
+                        @php $nbClassesAnnee = $statsParAnnee[$annee->libelle] ?? 0; @endphp
+                        <button type="button"
+                                onclick="toggleInit({{ $annee->id }})"
+                                class="px-3 py-1.5 rounded-lg text-xs font-medium border border-indigo-300 text-indigo-600 hover:bg-indigo-50">
+                            ↗ Initialiser
+                        </button>
                     </div>
+                </div>
+
+                {{-- Panneau d'initialisation (transition d'année) --}}
+                <div id="init-{{ $annee->id }}" class="hidden border-t border-dashed border-indigo-200 bg-indigo-50/60 px-4 py-4">
+                    <p class="text-sm font-medium text-indigo-800 mb-3">
+                        Copier les classes et élèves d'une autre année vers <strong>{{ $annee->libelle }}</strong>
+                        @if($nbClassesAnnee > 0)
+                        <span class="ml-2 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs">{{ $nbClassesAnnee }} classe(s) déjà présente(s) — sera ignorées si même nom</span>
+                        @endif
+                    </p>
+                    <form action="{{ route('admin.annees.initialiser', $annee) }}" method="POST"
+                          onsubmit="return confirm('Copier les classes et transférer les élèves actifs vers {{ $annee->libelle }} ?')">
+                        @csrf
+                        <div class="flex items-end gap-3 flex-wrap">
+                            <div>
+                                <label class="block text-xs font-medium text-indigo-700 mb-1">Année source (copier depuis)</label>
+                                <select name="source_libelle" required
+                                        class="border border-indigo-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-indigo-400 focus:outline-none" style="min-width:160px;">
+                                    <option value="">-- Choisir --</option>
+                                    @foreach($annees->where('id', '!=', $annee->id)->sortByDesc('date_debut') as $src)
+                                    <option value="{{ $src->libelle }}">
+                                        {{ $src->libelle }}
+                                        ({{ $statsParAnnee[$src->libelle] ?? 0 }} classes)
+                                    </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="text-xs text-indigo-600 leading-relaxed max-w-xs">
+                                <strong>Ce qui sera copié :</strong><br>
+                                ✓ Structure des classes (nom, niveau, catégorie)<br>
+                                ✓ Associations matières–classes<br>
+                                ✗ Élèves (à inscrire manuellement)
+                            </div>
+                            <div class="flex gap-2">
+                                <button type="submit"
+                                        class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+                                    Lancer l'initialisation
+                                </button>
+                                <button type="button" onclick="toggleInit({{ $annee->id }})"
+                                        class="px-4 py-1.5 border border-gray-300 text-gray-600 rounded-lg text-sm hover:bg-gray-50">
+                                    Annuler
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
 
                 {{-- Formulaire édition dates (caché par défaut) --}}
@@ -234,8 +291,10 @@
 @push('scripts')
 <script>
 function toggleEdit(id) {
-    const el = document.getElementById('edit-' + id);
-    el.classList.toggle('hidden');
+    document.getElementById('edit-' + id).classList.toggle('hidden');
+}
+function toggleInit(id) {
+    document.getElementById('init-' + id).classList.toggle('hidden');
 }
 </script>
 @endpush

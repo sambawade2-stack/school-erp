@@ -123,6 +123,35 @@
             </div>
         </div>
 
+        {{-- Régime de paiement --}}
+        <div class="pt-1">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Régime de paiement <span class="text-red-500">*</span></label>
+            <div class="flex gap-3">
+                <label class="flex-1 flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all
+                    {{ old('regime_paiement', 'plein_tarif') === 'plein_tarif' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-300' }}"
+                    id="label-plein">
+                    <input type="radio" name="regime_paiement" value="plein_tarif"
+                        {{ old('regime_paiement', 'plein_tarif') === 'plein_tarif' ? 'checked' : '' }}
+                        class="accent-blue-600" onchange="updateRegimeUI()">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">Plein tarif</p>
+                        <p class="text-xs text-gray-500">Paiement 100% des frais</p>
+                    </div>
+                </label>
+                <label class="flex-1 flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all
+                    {{ old('regime_paiement') === 'demi_tarif' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:border-amber-300' }}"
+                    id="label-demi">
+                    <input type="radio" name="regime_paiement" value="demi_tarif"
+                        {{ old('regime_paiement') === 'demi_tarif' ? 'checked' : '' }}
+                        class="accent-amber-500" onchange="updateRegimeUI()">
+                    <div>
+                        <p class="text-sm font-semibold text-gray-800">Demi-tarif</p>
+                        <p class="text-xs text-gray-500">Paiement 50% des frais</p>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">Adresse</label>
             <textarea name="adresse" rows="2"
@@ -246,5 +275,22 @@ document.addEventListener('DOMContentLoaded', function() {
     inputPrenom.addEventListener('blur', verifierDoublon);
     inputNom.addEventListener('blur', verifierDoublon);
 });
+
+function updateRegimeUI() {
+    var plein = document.querySelector('input[value="plein_tarif"]').checked;
+    var labelPlein = document.getElementById('label-plein');
+    var labelDemi  = document.getElementById('label-demi');
+    if (plein) {
+        labelPlein.className = labelPlein.className.replace('border-gray-200', 'border-blue-500').replace('hover:border-blue-300', '');
+        labelPlein.classList.add('border-blue-500', 'bg-blue-50');
+        labelDemi.classList.remove('border-amber-500', 'bg-amber-50');
+        labelDemi.classList.add('border-gray-200', 'hover:border-amber-300');
+    } else {
+        labelDemi.className = labelDemi.className.replace('border-gray-200', 'border-amber-500').replace('hover:border-amber-300', '');
+        labelDemi.classList.add('border-amber-500', 'bg-amber-50');
+        labelPlein.classList.remove('border-blue-500', 'bg-blue-50');
+        labelPlein.classList.add('border-gray-200', 'hover:border-blue-300');
+    }
+}
 </script>
 @endpush

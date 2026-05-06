@@ -48,13 +48,39 @@
             </select>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">Classe</label>
-            <select name="classe_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <option value="">-- Toutes les classes --</option>
-                @foreach($classes as $classe)
-                <option value="{{ $classe->id }}" {{ old('classe_id') == $classe->id ? 'selected' : '' }}>{{ $classe->nom }}</option>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Classes</label>
+            @php
+                $niveauxLabels = ['elementaire' => 'Élémentaire', 'college' => 'Collège', 'terminal' => 'Terminal'];
+                $oldIds = old('classe_ids', []);
+            @endphp
+            @if($classes->isEmpty())
+                <p class="text-xs text-gray-400 italic">Aucune classe créée.</p>
+            @else
+            <div class="border border-gray-200 rounded-lg divide-y divide-gray-100 overflow-hidden">
+                @foreach($niveauxLabels as $niveauKey => $niveauLabel)
+                    @php $groupe = $classes[$niveauKey] ?? collect(); @endphp
+                    @if($groupe->isNotEmpty())
+                    <div class="p-3">
+                        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">{{ $niveauLabel }}</p>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($groupe as $classe)
+                            <label class="flex items-center gap-1.5 px-3 py-1.5 border rounded-lg cursor-pointer text-sm transition-colors
+                                {{ in_array($classe->id, $oldIds) ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50' }}"
+                                id="label-classe-{{ $classe->id }}">
+                                <input type="checkbox" name="classe_ids[]" value="{{ $classe->id }}"
+                                    {{ in_array($classe->id, $oldIds) ? 'checked' : '' }}
+                                    class="accent-blue-600"
+                                    onchange="toggleClasseLabel(this, {{ $classe->id }})">
+                                {{ $classe->nom }}
+                            </label>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
                 @endforeach
-            </select>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Laissez tout décoché pour une matière commune à toutes les classes.</p>
+            @endif
         </div>
     </div>
     <div class="flex gap-3 mt-5">
@@ -64,3 +90,18 @@
 </form>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+function toggleClasseLabel(checkbox, id) {
+    const label = document.getElementById('label-classe-' + id);
+    if (checkbox.checked) {
+        label.classList.add('border-blue-500', 'bg-blue-50', 'text-blue-700', 'font-medium');
+        label.classList.remove('border-gray-200', 'text-gray-700');
+    } else {
+        label.classList.remove('border-blue-500', 'bg-blue-50', 'text-blue-700', 'font-medium');
+        label.classList.add('border-gray-200', 'text-gray-700');
+    }
+}
+</script>
+@endpush

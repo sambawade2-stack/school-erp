@@ -36,11 +36,22 @@
             @foreach($etudiants as $etu)
             <option value="{{ $etu->id }}"
                     data-niveau="{{ $niveauxEtudiants[$etu->id] ?? '' }}"
+                    data-regime="{{ $etu->regime_paiement ?? 'plein_tarif' }}"
                     {{ (old('etudiant_id') ?? $etudiant?->id) == $etu->id ? 'selected' : '' }}>
                 {{ $etu->nom_complet }}{{ $etu->classe ? ' (' . $etu->classe->nom . ')' : '' }}
+                {{ ($etu->regime_paiement ?? 'plein_tarif') === 'demi_tarif' ? '— ½ tarif' : '' }}
             </option>
             @endforeach
         </select>
+    </div>
+
+    {{-- Bandeau demi-tarif (affiché dynamiquement via JS) --}}
+    <div id="bandeau-demi-tarif" style="display:none"
+         class="flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-300 text-amber-800 rounded-lg text-sm">
+        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span>Élève en <strong>demi-tarif</strong> — les montants affichés correspondent à <strong>50%</strong> du tarif normal.</span>
     </div>
 
     {{-- Tarifs prédéfinis --}}
@@ -65,7 +76,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     <span class="text-white font-bold text-sm tracking-wide uppercase">Frais d'Inscription</span>
-                    <span class="text-blue-200 text-xs">(1ère Mensualité · Avance Juillet · Tenues · Assurance Maladie)</span>
+                    <span class="text-blue-200 text-xs">(1ère Mensualité · Avance Juillet · Tenues · Assurance Maladie · Inscription)</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span id="bloc-inscription-total" class="text-white font-bold text-sm"></span>
@@ -137,7 +148,7 @@
 
             {{-- Mode manuel (sans tarifs ou en complément) --}}
             <div id="mode-manuel">
-                <p class="text-xs text-gray-400 mb-3">Ou saisissez manuellement :</p>
+                <p class="text-xs text-gray-400 mb-3">Ou saisissez un paiement libre :</p>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Montant total dû <span class="text-red-500">*</span></label>
@@ -162,7 +173,8 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1.5">Date <span class="text-red-500">*</span></label>
-                        <input type="date" name="date_paiement" id="date_paiement" value="{{ old('date_paiement', today()->format('Y-m-d')) }}" required
+                        <input type="date" name="date_paiement" id="date_paiement" value="{{ old('date_paiement', $dateDefaut) }}" required
+                               max="{{ today()->format('Y-m-d') }}"
                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                     <div>
@@ -184,22 +196,51 @@
                     <input type="text" name="annee_scolaire" id="annee_scolaire" value="{{ old('annee_scolaire', $anneeActive?->libelle ?? '') }}" required
                            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
-                <div id="date-trimestre-multi" style="display:none">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
-                            <input type="date" id="date_paiement_multi" value="{{ today()->format('Y-m-d') }}"
-                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                {{-- Date + trimestre pour les paiements multi (grille tarifaire) --}}
+                <div id="date-trimestre-multi" style="display:none" class="space-y-3">
+
+                    {{-- Navigation rapide par mois --}}
+                    @if(!empty($moisDisponibles))
+                    <div>
+                        <label class="block text-xs font-medium text-gray-500 mb-1.5">Mois du paiement</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            @foreach($moisDisponibles as $m)
+                            <button type="button"
+                                    onclick="setMoisPaiement('{{ $m['valeur'] }}')"
+                                    data-date="{{ $m['valeur'] }}"
+                                    class="mois-btn px-2.5 py-1 text-xs font-medium rounded-full border border-gray-300 text-gray-600 hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+                                {{ $m['label'] }}
+                            </button>
+                            @endforeach
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1.5">Trimestre</label>
-                            <select id="trimestre_multi" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                                <option value="">-- Aucun --</option>
-                                @foreach(['T1','T2','T3','S1','S2','S3'] as $t)
-                                <option value="{{ $t }}" {{ old('trimestre', $trimestreDefaut) === $t ? 'selected' : '' }}>{{ $t }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                    </div>
+                    @endif
+
+                    {{-- Date commune --}}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Date précise du paiement</label>
+                        <input type="date" id="date_paiement_multi" value="{{ $dateDefaut }}" max="{{ today()->format('Y-m-d') }}"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    </div>
+
+                    {{-- Trimestre : uniquement pour la mensualité --}}
+                    <div id="bloc-trimestre-multi" style="display:none">
+                        <label class="block text-sm font-medium text-gray-700 mb-1.5">Trimestre <span class="text-xs text-gray-400">(mensualité)</span></label>
+                        <select id="trimestre_multi" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="">-- Aucun --</option>
+                            @foreach(['T1','T2','T3','S1','S2','S3'] as $t)
+                            <option value="{{ $t }}" {{ old('trimestre', $trimestreDefaut) === $t ? 'selected' : '' }}>{{ $t }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Note inscription annuelle --}}
+                    <div id="note-inscription-annuelle" style="display:none"
+                         class="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Les frais d'inscription sont annuels — aucun trimestre associé.</span>
                     </div>
                 </div>
             </div>
@@ -253,11 +294,19 @@ const niveaux = @json($niveauxEtudiants ?? []);
 const typeLabels = @json($typeLabels);
 const typeColors = @json($typeColors);
 let multiMode = false;
+let facteurTarif = 1; // 1 = plein tarif, 0.5 = demi-tarif
 
 document.getElementById('etudiant_select').addEventListener('change', function () {
     const id = this.value;
+    const opt = this.options[this.selectedIndex];
     document.getElementById('etudiant_id_hidden').value = id;
     document.querySelectorAll('.tarif-btn.selected').forEach(b => b.classList.remove('selected'));
+
+    // Appliquer le facteur selon le régime
+    facteurTarif = (opt.dataset.regime === 'demi_tarif') ? 0.5 : 1;
+    const bandeau = document.getElementById('bandeau-demi-tarif');
+    if (bandeau) bandeau.style.display = facteurTarif < 1 ? '' : 'none';
+
     recalculer();
     afficherTarifs(niveaux[id] ?? null);
 });
@@ -265,6 +314,10 @@ document.getElementById('etudiant_select').addEventListener('change', function (
 window.addEventListener('DOMContentLoaded', function () {
     const sel = document.getElementById('etudiant_select');
     if (sel.value) {
+        const opt = sel.options[sel.selectedIndex];
+        facteurTarif = (opt.dataset.regime === 'demi_tarif') ? 0.5 : 1;
+        const bandeau = document.getElementById('bandeau-demi-tarif');
+        if (bandeau) bandeau.style.display = facteurTarif < 1 ? '' : 'none';
         document.getElementById('etudiant_id_hidden').value = sel.value;
         afficherTarifs(niveaux[sel.value] ?? null);
     }
@@ -279,6 +332,25 @@ function afficherTarifs(niveau) {
         if (!niveau || btn.dataset.niveau === niveau) {
             btn.style.display = '';
             visible++;
+            // Afficher le montant effectif selon le régime
+            const montantOriginal = parseFloat(btn.dataset.montantOriginal || btn.dataset.montant);
+            btn.dataset.montantOriginal = montantOriginal; // sauvegarder le tarif 100%
+            const montantEffectif = montantOriginal * facteurTarif;
+            btn.dataset.montant = montantEffectif;
+            // Mettre à jour le texte affiché
+            const pMontant = btn.querySelector('p.text-sm.font-bold');
+            if (pMontant) {
+                pMontant.textContent = formatMontant(montantEffectif) + ' FCFA';
+                if (facteurTarif < 1) {
+                    pMontant.title = 'Tarif normal : ' + formatMontant(montantOriginal) + ' FCFA (50% appliqué)';
+                    pMontant.classList.add('text-amber-600');
+                    pMontant.classList.remove('text-blue-700');
+                } else {
+                    pMontant.title = '';
+                    pMontant.classList.remove('text-amber-600');
+                    pMontant.classList.add('text-blue-700');
+                }
+            }
         } else {
             btn.style.display = 'none';
             btn.classList.remove('selected');
@@ -354,7 +426,7 @@ function recalculer() {
                     <div class="flex items-center gap-2">
                         <label class="text-xs font-medium text-gray-500">Montant versé :</label>
                         <input type="number" data-type="${type}" class="montant-verse flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                               value="${data.total}" min="0" step="any" onchange="updateJson()">
+                               value="${data.total}" min="0" step="any" onchange="updateJson(); updateTotalGeneral();">
                         <span class="text-xs text-gray-400">/ ${formatMontant(data.total)}</span>
                     </div>
                 </div>
@@ -362,9 +434,17 @@ function recalculer() {
             container.appendChild(card);
         });
 
-        document.getElementById('total-general-montant').textContent = formatMontant(totalGeneral) + ' FCFA';
+        updateTotalGeneral();
         document.getElementById('total-general-detail').textContent = types.length + ' paiement(s) seront créés';
         document.getElementById('btn-count').textContent = '(' + types.length + ' paiements)';
+
+        // Afficher/masquer trimestre et note inscription selon les types sélectionnés
+        const aMensualite   = types.includes('mensualite');
+        const aInscription  = types.some(t => groupeInscription.includes(t));
+        const blocTrimestre = document.getElementById('bloc-trimestre-multi');
+        const noteInscr     = document.getElementById('note-inscription-annuelle');
+        if (blocTrimestre) blocTrimestre.style.display = aMensualite ? '' : 'none';
+        if (noteInscr)     noteInscr.style.display     = aInscription ? '' : 'none';
 
         updateJson();
     } else {
@@ -379,6 +459,16 @@ function recalculer() {
         document.getElementById('montant_total').value = '';
         document.getElementById('montant').value = '';
     }
+}
+
+function updateTotalGeneral() {
+    let total = 0;
+    document.querySelectorAll('.montant-verse').forEach(input => {
+        const val = parseFloat(input.value);
+        if (!isNaN(val) && val > 0) total += val;
+    });
+    const el = document.getElementById('total-general-montant');
+    if (el) el.textContent = formatMontant(total) + ' FCFA';
 }
 
 function updateJson() {
@@ -453,16 +543,34 @@ function updateBlocInscriptionUI() {
     if (el) el.textContent = total > 0 ? formatMontant(total) + ' FCFA' : '';
 }
 
+function setMoisPaiement(dateVal) {
+    // Mettre à jour le champ date multi
+    const dateInput = document.getElementById('date_paiement_multi');
+    if (dateInput) dateInput.value = dateVal;
+
+    // Mettre à jour l'apparence des boutons
+    document.querySelectorAll('.mois-btn').forEach(btn => {
+        if (btn.dataset.date === dateVal) {
+            btn.classList.add('border-blue-500', 'bg-blue-600', 'text-white');
+            btn.classList.remove('border-gray-300', 'text-gray-600', 'hover:border-blue-400', 'hover:bg-blue-50', 'hover:text-blue-700');
+        } else {
+            btn.classList.remove('border-blue-500', 'bg-blue-600', 'text-white');
+            btn.classList.add('border-gray-300', 'text-gray-600', 'hover:border-blue-400', 'hover:bg-blue-50', 'hover:text-blue-700');
+        }
+    });
+}
+
 // Intercepter le submit pour injecter date/trimestre en mode multi
 document.getElementById('paiement-form').addEventListener('submit', function(e) {
     if (multiMode) {
-        const date = document.getElementById('date_paiement_multi').value;
-        const trimestre = document.getElementById('trimestre_multi').value;
-        const json = JSON.parse(document.getElementById('paiements_json').value || '[]');
+        const date      = document.getElementById('date_paiement_multi').value;
+        const trimestre = document.getElementById('trimestre_multi')?.value ?? '';
+        const json      = JSON.parse(document.getElementById('paiements_json').value || '[]');
 
         json.forEach(p => {
             p.date_paiement = date;
-            p.trimestre = trimestre;
+            // Inscription = frais annuels → pas de trimestre
+            p.trimestre = groupeInscription.includes(p.type_paiement) ? '' : trimestre;
         });
 
         document.getElementById('paiements_json').value = JSON.stringify(json);

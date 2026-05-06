@@ -26,7 +26,7 @@ class CompositionController extends Controller
     public function create()
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('compositions.create', compact('classes', 'matieres'));
     }
 
@@ -35,17 +35,25 @@ class CompositionController extends Controller
         $data = $request->validate([
             'intitule'         => 'required|string|max:150',
             'matiere_id'       => 'required|exists:matieres,id',
-            'classe_id'        => 'required|exists:classes,id',
+            'classe_ids'       => 'required|array|min:1',
+            'classe_ids.*'     => 'exists:classes,id',
             'date_composition' => 'required|date',
             'note_max'         => 'required|numeric|min:1',
             'annee_scolaire'   => 'required|string',
             'trimestre'        => 'required|in:T1,T2,T3,S1,S2,S3',
         ]);
 
-        Composition::create($data);
+        $classeIds = $data['classe_ids'];
+        unset($data['classe_ids']);
 
-        return redirect()->route('examens.index', ['tab' => 'compositions'])
-            ->with('succes', 'Composition créée avec succès.');
+        foreach ($classeIds as $classeId) {
+            Composition::create(array_merge($data, ['classe_id' => $classeId]));
+        }
+
+        $nb = count($classeIds);
+        $msg = $nb > 1 ? "{$nb} compositions créées avec succès." : 'Composition créée avec succès.';
+
+        return redirect()->route('examens.index', ['tab' => 'compositions'])->with('succes', $msg);
     }
 
     public function show(Composition $composition)
@@ -59,7 +67,7 @@ class CompositionController extends Controller
     public function edit(Composition $composition)
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('compositions.edit', compact('composition', 'classes', 'matieres'));
     }
 
@@ -68,17 +76,33 @@ class CompositionController extends Controller
         $data = $request->validate([
             'intitule'         => 'required|string|max:150',
             'matiere_id'       => 'required|exists:matieres,id',
-            'classe_id'        => 'required|exists:classes,id',
+            'classe_ids'       => 'required|array|min:1',
+            'classe_ids.*'     => 'exists:classes,id',
             'date_composition' => 'required|date',
             'note_max'         => 'required|numeric|min:1',
             'annee_scolaire'   => 'required|string',
             'trimestre'        => 'required|in:T1,T2,T3,S1,S2,S3',
         ]);
 
+        $classeIds = $data['classe_ids'];
+        unset($data['classe_ids']);
+
         $composition->update($data);
 
-        return redirect()->route('examens.index', ['tab' => 'compositions'])
-            ->with('succes', 'Composition modifiée avec succès.');
+        // Créer de nouvelles compositions pour les classes supplémentaires
+        $nouvelles = 0;
+        foreach ($classeIds as $classeId) {
+            if ($classeId != $composition->classe_id) {
+                Composition::create(array_merge($data, ['classe_id' => $classeId]));
+                $nouvelles++;
+            }
+        }
+
+        $msg = $nouvelles > 0
+            ? "Composition mise à jour + {$nouvelles} nouvelle(s) créée(s)."
+            : 'Composition mise à jour.';
+
+        return redirect()->route('examens.index', ['tab' => 'compositions'])->with('succes', $msg);
     }
 
     public function destroy(Composition $composition)

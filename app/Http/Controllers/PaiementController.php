@@ -95,6 +95,22 @@ class PaiementController extends Controller
         // Trimestre courant par défaut (depuis l'année scolaire active)
         $trimestreDefaut = $anneeActive?->trimestre_actuel ?? 'T1';
 
+        $dateDefaut = today()->format('Y-m-d');
+
+        // Mois disponibles depuis le début de l'année jusqu'à aujourd'hui
+        $moisDisponibles = [];
+        if ($anneeActive?->date_debut) {
+            $cursor = $anneeActive->date_debut->copy()->startOfMonth();
+            $fin    = now()->startOfMonth();
+            while ($cursor->lte($fin)) {
+                $moisDisponibles[] = [
+                    'valeur' => $cursor->format('Y-m-d'),
+                    'label'  => ucfirst($cursor->locale('fr')->isoFormat('MMM YY')),
+                ];
+                $cursor->addMonth();
+            }
+        }
+
         // Pré-remplissage depuis un paiement partiel existant
         $prefill = [
             'type_paiement'   => $request->type_paiement,
@@ -102,7 +118,7 @@ class PaiementController extends Controller
             'montant_restant' => $request->montant_restant ? (float) $request->montant_restant : null,
         ];
 
-        return view('paiements.create', compact('etudiants', 'etudiant', 'niveauxEtudiants', 'tarifs', 'anneeActive', 'trimestreDefaut', 'prefill'));
+        return view('paiements.create', compact('etudiants', 'etudiant', 'niveauxEtudiants', 'tarifs', 'anneeActive', 'trimestreDefaut', 'dateDefaut', 'moisDisponibles', 'prefill'));
     }
 
     public function store(Request $request)
@@ -136,7 +152,7 @@ class PaiementController extends Controller
                     'montant'        => $montant,
                     'type_paiement'  => $p['type_paiement'],
                     'date_paiement'  => $p['date_paiement'] ?? now()->toDateString(),
-                    'trimestre'      => $p['trimestre'] ?? null,
+                    'trimestre'      => $p['trimestre'] ?: null,
                     'annee_scolaire' => $request->annee_scolaire,
                     'numero_recu'    => $this->genererNumeroRecu(),
                     'numero_facture' => $numeroFacture,
@@ -169,6 +185,7 @@ class PaiementController extends Controller
         ]);
 
         $data = $request->only(['etudiant_id', 'montant_total', 'montant', 'type_paiement', 'date_paiement', 'trimestre', 'annee_scolaire', 'remarque']);
+        $data['trimestre']   = $data['trimestre'] ?: null;
         $data['numero_recu'] = $this->genererNumeroRecu();
         $data['statut'] = (float)$data['montant'] >= (float)$data['montant_total'] ? 'complet' : 'partiel';
 

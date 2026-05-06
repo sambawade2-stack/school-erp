@@ -19,6 +19,10 @@
         Années scolaires
         @if($anneeActiveNav)<span class="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs rounded-full font-semibold">{{ $anneeActiveNav->libelle }}</span>@else<span class="px-1.5 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-semibold">!</span>@endif
     </a>
+    <a href="{{ route('admin.users.index') }}" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Utilisateurs
+    </a>
 </div>
 
 {{-- Sélecteur d'année --}}
@@ -39,9 +43,20 @@
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-    {{-- Formulaire ajout tarif --}}
+    {{-- Formulaire ajout / mise à jour d'un tarif --}}
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Ajouter un tarif</h3>
+        <h3 class="font-semibold text-gray-800 mb-1">Définir un tarif</h3>
+        <p class="text-xs text-gray-500 mb-4">Si le type existe déjà pour ce niveau, le montant sera mis à jour.</p>
+
+        @if(session('succes'))
+        <div class="mb-4 px-3 py-2 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">{{ session('succes') }}</div>
+        @endif
+        @if($errors->any())
+        <div class="mb-4 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            @foreach($errors->all() as $e)<p>{{ $e }}</p>@endforeach
+        </div>
+        @endif
+
         <form action="{{ route('admin.tarifs.store') }}" method="POST" class="space-y-4">
             @csrf
             <input type="hidden" name="annee_scolaire" value="{{ $anneeSelectionnee }}">
@@ -69,26 +84,20 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1.5">Libellé <span class="text-red-500">*</span></label>
-                <input type="text" name="libelle" value="{{ old('libelle') }}" placeholder="ex: Scolarité T1" required
-                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                @error('libelle')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
-            </div>
-
-            <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">Montant (FCFA) <span class="text-red-500">*</span></label>
                 <input type="number" name="montant" value="{{ old('montant') }}" min="0" step="1" required
+                       placeholder="ex: 15 000"
                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 @error('montant')<p class="text-xs text-red-500 mt-1">{{ $message }}</p>@enderror
             </div>
 
             <button type="submit" class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                + Ajouter le tarif
+                Enregistrer le tarif
             </button>
         </form>
     </div>
 
-    {{-- Liste des tarifs groupés par niveau --}}
+    {{-- Grille tarifaire par niveau --}}
     <div class="lg:col-span-2 space-y-5">
 
         @php
@@ -98,10 +107,14 @@
                 'college'     => ['bg' => '#f0fdf4', 'border' => '#bbf7d0', 'badge_bg' => '#dcfce7', 'badge_text' => '#166534'],
                 'terminal'    => ['bg' => '#faf5ff', 'border' => '#e9d5ff', 'badge_bg' => '#ede9fe', 'badge_text' => '#5b21b6'],
             ];
+            $allTypes = \App\Models\Tarif::TYPES;
         @endphp
 
-        @forelse($niveauxOrdre as $niveauKey => $niveauLabel)
-        @php $lignes = $tarifs[$niveauKey] ?? collect(); @endphp
+        @foreach($niveauxOrdre as $niveauKey => $niveauLabel)
+        @php
+            $lignesNiveau = ($tarifs[$niveauKey] ?? collect())->keyBy('type_frais');
+            $total = $lignesNiveau->sum('montant');
+        @endphp
         <div class="bg-white rounded-xl shadow-sm border p-5"
              style="border-color: {{ $couleurs[$niveauKey]['border'] }}; background: {{ $couleurs[$niveauKey]['bg'] }}">
 
@@ -111,58 +124,58 @@
                           style="background:{{ $couleurs[$niveauKey]['badge_bg'] }};color:{{ $couleurs[$niveauKey]['badge_text'] }}">
                         {{ $niveauLabel }}
                     </span>
-                    <span class="text-xs text-gray-500">{{ $lignes->count() }} tarif(s)</span>
+                    <span class="text-xs text-gray-500">{{ $lignesNiveau->count() }} / {{ count($allTypes) }} type(s)</span>
                 </div>
-                @if($lignes->isNotEmpty())
+                @if($lignesNiveau->isNotEmpty())
                 <span class="text-sm font-semibold text-gray-700">
-                    Total : {{ number_format($lignes->sum('montant'), 0, ',', ' ') }} FCFA
+                    Total : {{ number_format($total, 0, ',', ' ') }} FCFA
                 </span>
                 @endif
             </div>
 
-            @if($lignes->isEmpty())
-            <p class="text-sm text-gray-400 text-center py-4">Aucun tarif défini pour ce niveau.</p>
-            @else
-            <div class="space-y-2">
-                @foreach($lignes as $tarif)
-                <div class="bg-white rounded-lg border border-gray-200 px-4 py-3 flex items-center gap-3">
+            <div class="space-y-1">
+                @foreach($allTypes as $typeKey => $typeLabel)
+                @php $tarif = $lignesNiveau[$typeKey] ?? null; @endphp
+                <div class="flex items-center gap-3 bg-white rounded-lg border px-4 py-2.5
+                    {{ $tarif ? 'border-gray-200' : 'border-dashed border-gray-200 opacity-60' }}">
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                {{ \App\Models\Tarif::TYPES[$tarif->type_frais] ?? $tarif->type_frais }}
-                            </span>
-                        </div>
-                        <p class="text-sm font-medium text-gray-800 mt-0.5">{{ $tarif->libelle }}</p>
+                        <p class="text-xs font-semibold uppercase tracking-wide"
+                           style="color: {{ \App\Models\Tarif::TYPE_COLORS[$typeKey]['color'] ?? '#6b7280' }}">
+                            {{ $typeLabel }}
+                        </p>
+                        @if($tarif)
+                        <p class="text-xs text-gray-500 mt-0.5">{{ $tarif->libelle }}</p>
+                        @else
+                        <p class="text-xs text-gray-400 italic">Non configuré</p>
+                        @endif
                     </div>
-                    <div class="text-right flex-shrink-0">
-                        {{-- Inline edit form --}}
-                        <form action="{{ route('admin.tarifs.update', $tarif) }}" method="POST" class="flex items-center gap-2">
-                            @csrf @method('PUT')
-                            <input type="hidden" name="libelle" value="{{ $tarif->libelle }}">
-                            <input type="number" name="montant" value="{{ $tarif->montant }}" min="0" step="1"
-                                   class="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none">
-                            <button type="submit" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">✓</button>
-                        </form>
-                    </div>
+
+                    @if($tarif)
+                    <form action="{{ route('admin.tarifs.update', $tarif) }}" method="POST" class="flex items-center gap-2 flex-shrink-0">
+                        @csrf @method('PUT')
+                        <input type="hidden" name="libelle" value="{{ $tarif->libelle }}">
+                        <input type="number" name="montant" value="{{ $tarif->montant }}" min="0" step="1"
+                               class="w-28 border border-gray-300 rounded px-2 py-1 text-sm text-right focus:ring-1 focus:ring-blue-500 focus:outline-none">
+                        <button type="submit" title="Enregistrer"
+                                class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">✓</button>
+                    </form>
                     <form action="{{ route('admin.tarifs.destroy', $tarif) }}" method="POST"
                           onsubmit="return confirm('Supprimer ce tarif ?')">
                         @csrf @method('DELETE')
-                        <button type="submit" class="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                        <button type="submit" title="Supprimer" class="p-1 text-gray-300 hover:text-red-500 transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                             </svg>
                         </button>
                     </form>
+                    @else
+                    <span class="text-xs text-gray-400 flex-shrink-0 pr-1">—</span>
+                    @endif
                 </div>
                 @endforeach
             </div>
-            @endif
         </div>
-        @empty
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-400">
-            Aucun tarif pour cette année. Utilisez le formulaire pour en ajouter.
-        </div>
-        @endforelse
+        @endforeach
 
     </div>
 </div>

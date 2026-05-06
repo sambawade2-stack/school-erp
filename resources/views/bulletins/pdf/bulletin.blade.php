@@ -73,13 +73,14 @@
         }
 
         /* Colonnes */
-        .col-matiere  { width: 38%; }
-        .col-coeff    { width: 8%;  text-align: center; }
-        .col-devoir   { width: 10%; text-align: center; }
-        .col-examen   { width: 10%; text-align: center; }
-        .col-compo    { width: 10%; text-align: center; }
-        .col-moy      { width: 9%;  text-align: center; font-weight: bold; }
-        .col-apprec   { width: 15%; text-align: center; }
+        .col-matiere    { width: 33%; }
+        .col-coeff      { width: 7%;  text-align: center; }
+        .col-devoir     { width: 9%;  text-align: center; }
+        .col-examen     { width: 9%;  text-align: center; }
+        .col-compo      { width: 9%;  text-align: center; }
+        .col-moy        { width: 8%;  text-align: center; font-weight: bold; }
+        .col-moy-classe { width: 10%; text-align: center; }
+        .col-apprec     { width: 15%; text-align: center; }
 
         /* Ligne de section (groupe) */
         .row-section td {
@@ -260,19 +261,21 @@
         @if($estElem)
         {{-- Élémentaire : composition seule --}}
         <tr>
-            <th style="width:55%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">MATIÈRES</th>
+            <th style="width:46%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">MATIÈRES</th>
             <th style="width:8%;  text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">COEFF.</th>
-            <th style="width:15%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">COMPOSITION</th>
-            <th style="width:22%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">APPRÉCIATION</th>
+            <th style="width:13%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">COMPOSITION</th>
+            <th style="width:13%; text-align:center; font-weight:bold; font-size:9.5px;  background:#f0f0f0;">MOY.<br>CLASSE</th>
+            <th style="width:20%; text-align:center; font-weight:bold; font-size:10.5px; background:#f0f0f0;">APPRÉCIATION</th>
         </tr>
         @else
         {{-- Secondaire : devoir + examen + composition --}}
         <tr>
-            <th class="col-matiere" rowspan="2">MATIÈRES</th>
-            <th class="col-coeff"  rowspan="2">COEFF.</th>
+            <th class="col-matiere"    rowspan="2">MATIÈRES</th>
+            <th class="col-coeff"      rowspan="2">COEFF.</th>
             <th colspan="3" style="text-align:center;">NOTES PAR TYPE</th>
-            <th class="col-moy"    rowspan="2">MOYENNE<br>/20</th>
-            <th class="col-apprec" rowspan="2">APPRÉCIATION</th>
+            <th class="col-moy"        rowspan="2">MOYENNE<br>/20</th>
+            <th class="col-moy-classe" rowspan="2">MOY.<br>CLASSE</th>
+            <th class="col-apprec"     rowspan="2">APPRÉCIATION</th>
         </tr>
         <tr>
             <th class="col-devoir" style="font-size:9.5px;">Devoir</th>
@@ -288,7 +291,7 @@
         {{-- ── Ligne de section (domain header) ── --}}
         @if($groupesSection->count() > 1 || $section !== 'Générale')
         <tr>
-            <td colspan="{{ $estElem ? 4 : 7 }}" style="background:#e0e0e0; font-weight:bold; text-align:center; font-size:10.5px; letter-spacing:0.5px; padding:5px 6px;">
+            <td colspan="{{ $estElem ? 5 : 8 }}" style="background:#e0e0e0; font-weight:bold; text-align:center; font-size:10.5px; letter-spacing:0.5px; padding:5px 6px;">
                 {{ strtoupper($section) }}
             </td>
         </tr>
@@ -302,7 +305,7 @@
         @endphp
         <tr>
             @if($estElem)
-            {{-- Élémentaire : 4 colonnes uniquement --}}
+            {{-- Élémentaire : 5 colonnes --}}
             <td style="font-weight:bold; font-size:10px; padding:4px 6px;">
                 {{ strtoupper($ligne['matiere']->nom) }}
             </td>
@@ -312,11 +315,14 @@
             <td style="text-align:center; font-weight:bold; font-size:11px; {{ $clrBas }}">
                 {{ $ligne['moyenne_compo'] !== null ? number_format($ligne['moyenne_compo'], 2) : '—' }}
             </td>
+            <td style="text-align:center; font-size:10px; color:#15803d;">
+                {{ $ligne['moyenne_classe'] !== null ? number_format($ligne['moyenne_classe'], 2) : '—' }}
+            </td>
             <td style="text-align:center; font-size:9.5px;">
                 {{ $ligne['mention'] }}
             </td>
             @else
-            {{-- Secondaire : 7 colonnes --}}
+            {{-- Secondaire : 8 colonnes --}}
             <td style="font-weight:bold; font-size:10px; padding:4px 6px;">
                 {{ strtoupper($ligne['matiere']->nom) }}
             </td>
@@ -335,6 +341,9 @@
             <td style="text-align:center; font-weight:bold; font-size:11px; {{ $clrBas }}">
                 {{ number_format($moy, 2) }}
             </td>
+            <td style="text-align:center; font-size:10px; color:#15803d;">
+                {{ $ligne['moyenne_classe'] !== null ? number_format($ligne['moyenne_classe'], 2) : '—' }}
+            </td>
             <td style="text-align:center; font-size:9.5px;">
                 {{ $ligne['mention'] }}
             </td>
@@ -344,14 +353,14 @@
 
         @empty
         <tr>
-            <td colspan="{{ $estElem ? 4 : 7 }}" style="text-align:center; padding:20px; font-style:italic; color:#666;">
+            <td colspan="{{ $estElem ? 5 : 8 }}" style="text-align:center; padding:20px; font-style:italic; color:#666;">
                 Aucune note disponible pour cette période.
             </td>
         </tr>
         @endforelse
 
         {{-- ── Ligne séparation ── --}}
-        @php $nbCols = $estElem ? 4 : 7; $nbColsLabel = $estElem ? 2 : 5; @endphp
+        @php $nbCols = $estElem ? 5 : 8; $nbColsLabel = $estElem ? 2 : 5; @endphp
         <tr><td colspan="{{ $nbCols }}" style="padding:0; border-left:none; border-right:none; height:1px; background:#000;"></td></tr>
 
         {{-- ── TOTAL des points ── --}}
@@ -362,7 +371,7 @@
             <td style="text-align:center; font-weight:bold; font-size:11px;">
                 {{ number_format($totalPoints, 2) }}
             </td>
-            @if(!$estElem)<td></td>@endif
+            <td></td><td></td>
         </tr>
 
         {{-- ── TOTAL des coefficients ── --}}
@@ -373,16 +382,20 @@
             <td style="text-align:center; font-weight:bold; font-size:11px;">
                 {{ number_format($totalCoeff, 0) }}
             </td>
-            @if(!$estElem)<td></td>@endif
+            <td></td><td></td>
         </tr>
 
-        {{-- ── MOYENNE GÉNÉRALE ── --}}
+        {{-- ── MOYENNE GÉNÉRALE + MOY. CLASSE sur la même ligne ── --}}
+        @php $moyGenClasse = $moyenneGeneraleClasse ?? 0.0; @endphp
         <tr style="background:#e8f0fe;">
             <td colspan="{{ $nbColsLabel }}" style="text-align:right; font-weight:bold; padding-right:8px; font-size:12px; letter-spacing:0.3px;">
                 MOYENNE GÉNÉRALE
             </td>
             <td style="text-align:center; font-weight:bold; font-size:13px; {{ $moyenneFinale < 10 ? 'color:#cc0000;' : 'color:#1a56db;' }}">
                 {{ number_format($moyenneFinale, 2) }}
+            </td>
+            <td style="text-align:center; font-weight:bold; font-size:11px; {{ $moyGenClasse > 0 && $moyGenClasse < 10 ? 'color:#cc0000;' : 'color:#15803d;' }}">
+                {{ $moyGenClasse > 0 ? number_format($moyGenClasse, 2) : '—' }}
             </td>
             <td style="text-align:center; font-weight:bold; font-size:10px;">
                 {{ $appreciationGen }}
@@ -397,7 +410,7 @@
             <td style="text-align:center; font-weight:bold; font-size:12px;">
                 {{ $rangFinal }}
             </td>
-            @if(!$estElem)<td></td>@endif
+            <td></td><td></td>
         </tr>
 
     </tbody>

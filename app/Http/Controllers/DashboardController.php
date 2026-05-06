@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\AnneeScolaire;
 use App\Models\Classe;
+use App\Models\Depense;
 use App\Models\Enseignant;
 use App\Models\Etablissement;
 use App\Models\Etudiant;
 use App\Models\Paiement;
 use App\Models\Tarif;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -21,6 +23,9 @@ class DashboardController extends Controller
             'classes'        => Classe::count(),
             'paiements_mois' => Paiement::whereMonth('date_paiement', now()->month)
                 ->whereYear('date_paiement', now()->year)
+                ->sum('montant'),
+            'depenses_mois'  => Depense::whereMonth('date_depense', now()->month)
+                ->whereYear('date_depense', now()->year)
                 ->sum('montant'),
         ];
 
@@ -39,8 +44,10 @@ class DashboardController extends Controller
         $anneeScolaire = AnneeScolaire::libelleActif();
 
         $retardQuery = Etudiant::where('statut', 'actif')
-            // Exclure les élèves inscrits ce mois-ci (leur mensualité commence le mois prochain)
-            ->whereRaw("date_inscription IS NULL OR DATE_FORMAT(date_inscription, '%Y-%m') < DATE_FORMAT(NOW(), '%Y-%m')")
+            ->where(function ($q) {
+                $q->whereNull('date_inscription')
+                  ->orWhere('date_inscription', '<', now()->startOfMonth());
+            })
             ->whereDoesntHave('paiements', function ($q) use ($trimestreCourant, $anneeScolaire) {
                 $q->where('type_paiement', 'mensualite')
                   ->where('annee_scolaire', $anneeScolaire)
@@ -63,8 +70,10 @@ class DashboardController extends Controller
             $anneeCourante = now()->year;
 
             $nbEnRetard = Etudiant::where('statut', 'actif')
-                // Exclure les élèves inscrits ce mois-ci (leur mensualité commence le mois prochain)
-                ->whereRaw("date_inscription IS NULL OR DATE_FORMAT(date_inscription, '%Y-%m') < DATE_FORMAT(NOW(), '%Y-%m')")
+                ->where(function ($q) {
+                    $q->whereNull('date_inscription')
+                      ->orWhere('date_inscription', '<', now()->startOfMonth());
+                })
                 ->whereDoesntHave('paiements', function ($q) use ($moisCourant, $anneeCourante) {
                     $q->where('type_paiement', 'mensualite')
                       ->whereMonth('date_paiement', $moisCourant)
@@ -81,13 +90,24 @@ class DashboardController extends Controller
             }
         }
 
-        // Statistiques mensuelles pour graphique (2 requêtes au lieu de 24)
+        // Statistiques mensuelles pour graphique
         $annee = now()->year;
-        $etudiantsParMois = Etudiant::selectRaw("DATE_FORMAT(created_at, '%m') as m, COUNT(*) as total")
+        $isSqlite = DB::connection()->getDriverName() === 'sqlite';
+
+        $etudiantsParMois = Etudiant::selectRaw(
+                $isSqlite
+                    ? "strftime('%m', created_at) as m, COUNT(*) as total"
+                    : "DATE_FORMAT(created_at, '%m') as m, COUNT(*) as total"
+            )
             ->whereYear('created_at', $annee)
             ->groupBy('m')
             ->pluck('total', 'm');
-        $paiementsParMois = Paiement::selectRaw("DATE_FORMAT(date_paiement, '%m') as m, SUM(montant) as total")
+
+        $paiementsParMois = Paiement::selectRaw(
+                $isSqlite
+                    ? "strftime('%m', date_paiement) as m, SUM(montant) as total"
+                    : "DATE_FORMAT(date_paiement, '%m') as m, SUM(montant) as total"
+            )
             ->whereYear('date_paiement', $annee)
             ->groupBy('m')
             ->pluck('total', 'm');
@@ -112,8 +132,10 @@ class DashboardController extends Controller
 
         $query = Etudiant::with('classe')
             ->where('statut', 'actif')
-            // Exclure les élèves inscrits ce mois-ci (leur mensualité commence le mois prochain)
-            ->whereRaw("date_inscription IS NULL OR DATE_FORMAT(date_inscription, '%Y-%m') < DATE_FORMAT(NOW(), '%Y-%m')")
+            ->where(function ($q) {
+                $q->whereNull('date_inscription')
+                  ->orWhere('date_inscription', '<', now()->startOfMonth());
+            })
             ->whereDoesntHave('paiements', function ($q) use ($trimestreCourant, $anneeScolaire) {
                 $q->where('type_paiement', 'mensualite')
                   ->where('annee_scolaire', $anneeScolaire)
