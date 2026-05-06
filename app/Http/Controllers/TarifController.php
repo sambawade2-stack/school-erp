@@ -25,15 +25,28 @@ class TarifController extends Controller
 
     public function store(Request $request)
     {
+        $types = array_keys(Tarif::TYPES);
+
         $request->validate([
             'annee_scolaire' => 'required|string',
             'niveau'         => 'required|in:elementaire,college,terminal',
-            'type_frais'     => 'required|string',
-            'libelle'        => 'required|string|max:100',
+            'type_frais'     => 'required|in:' . implode(',', $types),
             'montant'        => 'required|numeric|min:0',
         ]);
 
-        Tarif::create($request->only(['annee_scolaire', 'niveau', 'type_frais', 'libelle', 'montant']));
+        $libelle = Tarif::TYPES[$request->type_frais] . ' ' . $request->annee_scolaire;
+
+        Tarif::updateOrCreate(
+            [
+                'annee_scolaire' => $request->annee_scolaire,
+                'niveau'         => $request->niveau,
+                'type_frais'     => $request->type_frais,
+            ],
+            [
+                'libelle' => $libelle,
+                'montant' => $request->montant,
+            ]
+        );
 
         return back()->with('succes', 'Tarif ajouté.');
     }

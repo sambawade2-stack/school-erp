@@ -47,7 +47,7 @@ class ExamenController extends Controller
     public function create()
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('examens.create', compact('classes', 'matieres'));
     }
 
@@ -80,7 +80,7 @@ class ExamenController extends Controller
     public function edit(Examen $examen)
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('examens.edit', compact('examen', 'classes', 'matieres'));
     }
 

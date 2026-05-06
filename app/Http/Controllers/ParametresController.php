@@ -185,13 +185,20 @@ class ParametresController extends Controller
             fn($s) => $s !== '' && !str_starts_with($s, '--')
         );
 
-        $pdo->exec("SET FOREIGN_KEY_CHECKS=0;");
-        foreach ($statements as $statement) {
-            if (trim($statement) !== '') {
-                $pdo->exec($statement);
+        $pdo->beginTransaction();
+        try {
+            $pdo->exec("SET FOREIGN_KEY_CHECKS=0;");
+            foreach ($statements as $statement) {
+                if (trim($statement) !== '') {
+                    $pdo->exec($statement);
+                }
             }
+            $pdo->exec("SET FOREIGN_KEY_CHECKS=1;");
+            $pdo->commit();
+        } catch (\Exception $e) {
+            $pdo->rollBack();
+            throw $e;
         }
-        $pdo->exec("SET FOREIGN_KEY_CHECKS=1;");
     }
 
     public function changerMotDePasse(Request $request)

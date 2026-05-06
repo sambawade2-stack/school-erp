@@ -5,16 +5,16 @@
 @section('contenu')
 
 @php
-    $ongletDefaut = request('tab', 'examens');
+    $ongletDefaut = request('tab', 'compositions');
     if (!in_array($ongletDefaut, ['examens', 'devoirs', 'compositions'])) {
-        $ongletDefaut = 'examens';
+        $ongletDefaut = 'compositions';
     }
 @endphp
 
 <div x-data="{ onglet: '{{ $ongletDefaut }}' }">
 
     {{-- Barre de navigation par onglets --}}
-    <div class="flex flex-wrap items-center gap-1 border-b border-gray-200 mb-0">
+    <div class="flex flex-wrap items-center gap-1 border-b border-gray-200 mb-0 justify-between">
 
         {{-- Filtres (à gauche) --}}
         <form action="{{ route('examens.index') }}" method="GET" class="flex flex-wrap items-center gap-2 mr-4">
@@ -48,7 +48,22 @@
             </select>
         </form>
 
-        {{-- Onglets --}}
+        {{-- Onglets : Compositions → Examens → Devoirs --}}
+        <button @click="onglet='compositions'"
+            :class="onglet==='compositions'
+                ? 'border-b-2 border-amber-500 text-amber-600 bg-amber-50/50'
+                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+            class="flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all -mb-px rounded-t-lg">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            Compositions
+            <span class="px-1.5 py-0.5 rounded-full text-xs font-semibold"
+                :class="onglet==='compositions' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'">
+                {{ $compositions->count() }}
+            </span>
+        </button>
+
         <button @click="onglet='examens'"
             :class="onglet==='examens'
                 ? 'border-b-2 border-blue-600 text-blue-600 bg-blue-50/50'
@@ -79,20 +94,25 @@
             </span>
         </button>
 
-        <button @click="onglet='compositions'"
-            :class="onglet==='compositions'
-                ? 'border-b-2 border-amber-500 text-amber-600 bg-amber-50/50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
-            class="flex items-center gap-2 px-5 py-3 text-sm font-medium transition-all -mb-px rounded-t-lg">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-            </svg>
-            Compositions
-            <span class="px-1.5 py-0.5 rounded-full text-xs font-semibold"
-                :class="onglet==='compositions' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'">
-                {{ $compositions->count() }}
-            </span>
-        </button>
+        {{-- Bouton d'ajout contextuel selon l'onglet actif --}}
+        <div class="ml-auto pl-3 flex items-center">
+            <a x-show="onglet==='compositions'" href="{{ route('compositions.create') }}"
+               class="flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg text-xs font-medium hover:opacity-90 transition-opacity"
+               style="background:#d97706;">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Nouvelle composition
+            </a>
+            <a x-show="onglet==='examens'" href="{{ route('examens.create') }}"
+               class="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-700 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Nouvel examen
+            </a>
+            <a x-show="onglet==='devoirs'" href="{{ route('devoirs.create') }}"
+               class="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Nouveau devoir
+            </a>
+        </div>
     </div>
 
     {{-- ═══════════════ EXAMENS ═══════════════ --}}

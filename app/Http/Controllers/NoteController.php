@@ -37,7 +37,11 @@ class NoteController extends Controller
             'notes.*' => 'nullable|numeric|min:0|max:' . $examen->note_max,
         ]);
 
+        $etudiantsValides = $examen->classe->etudiants()
+            ->where('statut', 'actif')->pluck('id')->flip();
+
         foreach ($request->notes as $etudiantId => $note) {
+            if (!$etudiantsValides->has((int) $etudiantId)) continue;
             if ($note !== null && $note !== '') {
                 Note::updateOrCreate(
                     ['examen_id' => $examen->id, 'etudiant_id' => $etudiantId, 'type' => 'examen'],
@@ -69,7 +73,11 @@ class NoteController extends Controller
             'notes.*' => 'nullable|numeric|min:0|max:' . $devoir->note_max,
         ]);
 
+        $etudiantsValides = $devoir->classe->etudiants()
+            ->where('statut', 'actif')->pluck('id')->flip();
+
         foreach ($request->notes as $etudiantId => $note) {
+            if (!$etudiantsValides->has((int) $etudiantId)) continue;
             if ($note !== null && $note !== '') {
                 Note::updateOrCreate(
                     ['devoir_id' => $devoir->id, 'etudiant_id' => $etudiantId, 'type' => 'devoir'],
@@ -101,7 +109,11 @@ class NoteController extends Controller
             'notes.*' => 'nullable|numeric|min:0|max:' . $composition->note_max,
         ]);
 
+        $etudiantsValides = $composition->classe->etudiants()
+            ->where('statut', 'actif')->pluck('id')->flip();
+
         foreach ($request->notes as $etudiantId => $note) {
+            if (!$etudiantsValides->has((int) $etudiantId)) continue;
             if ($note !== null && $note !== '') {
                 Note::updateOrCreate(
                     ['composition_id' => $composition->id, 'etudiant_id' => $etudiantId, 'type' => 'composition'],
@@ -125,7 +137,7 @@ class NoteController extends Controller
      *   3. Moyenne générale = Σ(moy_matière × coeff) / Σ(coeff)
      *   4. Rang calculé par comparaison avec les camarades
      */
-    private function chargerNotesBulletin(Etudiant $etudiant, string $anneeScolaire, string $trimestre): array
+    private function chargerNotesBulletin(Etudiant $etudiant, string $anneeScolaire, string $trimestre, ?array $precomputedMoyClasse = null): array
     {
         $isElementaire = in_array($etudiant->classe?->categorie, ['elementaire', 'prescolaire']);
 
@@ -157,7 +169,7 @@ class NoteController extends Controller
             ->groupBy('composition.matiere.nom');
 
         // Calcul pondéré par matière
-        $matieres         = Matiere::where('classe_id', $etudiant->classe_id)->get();
+        $matieres         = Matiere::whereHas('classes', fn($q) => $q->where('classes.id', $etudiant->classe_id))->get();
         $lignesMatiere    = [];
         $totalPoints      = 0.0;
         $totalCoefficient = 0.0;
@@ -216,10 +228,17 @@ class NoteController extends Controller
 
         $rang = $this->calculerRang($etudiant, $anneeScolaire, $trimestre, $moyennePonderee);
 
+        $moyennesClasse = $precomputedMoyClasse ?? $this->calculerMoyennesClasse($etudiant->classe_id, $anneeScolaire, $trimestre);
+        foreach ($lignesMatiere as &$ligne) {
+            $ligne['moyenne_classe'] = $moyennesClasse['par_matiere'][$ligne['matiere']->id] ?? null;
+        }
+        unset($ligne);
+        $moyenneGeneraleClasse = $moyennesClasse['generale'];
+
         return compact(
             'notesExamen', 'notesDevoir', 'notesComposition',
             'moyenne', 'lignesMatiere', 'moyennePonderee',
-            'totalCoefficient', 'rang'
+            'totalCoefficient', 'rang', 'moyenneGeneraleClasse'
         );
     }
 
@@ -238,7 +257,7 @@ class NoteController extends Controller
     /** Rang de l'étudiant dans sa classe basé sur la moyenne pondérée. */
     private function calculerRang(Etudiant $etudiant, string $annee, string $trimestre, float $moyenneEtudiant): int
     {
-        $matieres     = Matiere::where('classe_id', $etudiant->classe_id)->get();
+        $matieres     = Matiere::whereHas('classes', fn($q) => $q->where('classes.id', $etudiant->classe_id))->get();
         $matiereIds   = $matieres->pluck('id');
         $camaradesIds = Etudiant::where('classe_id', $etudiant->classe_id)
             ->where('statut', 'actif')->where('id', '!=', $etudiant->id)->pluck('id');
@@ -303,6 +322,46 @@ class NoteController extends Controller
         return $rang;
     }
 
+    /** Moyenne de chaque matière + moyenne générale pour tous les élèves actifs d'une classe. */
+    private function calculerMoyennesClasse(int $classeId, string $annee, string $trimestre): array
+    {
+        $matieres  = Matiere::whereHas('classes', fn($q) => $q->where('classes.id', $classeId))->get();
+        $etudiants = Etudiant::where('classe_id', $classeId)->where('statut', 'actif')->get();
+
+        if ($etudiants->isEmpty() || $matieres->isEmpty()) {
+            return ['par_matiere' => [], 'generale' => 0.0];
+        }
+
+        $classe    = Classe::find($classeId);
+        $categorie = $classe?->categorie ?? 'college';
+
+        $moyennesParMatiere = [];
+        $totalPts   = 0.0;
+        $totalCoeff = 0.0;
+
+        foreach ($matieres as $matiere) {
+            $moyennes = [];
+            foreach ($etudiants as $etudiant) {
+                $moy = $matiere->moyenneEtudiant($etudiant->id, $annee, $trimestre, $categorie);
+                if ($moy > 0) {
+                    $moyennes[] = $moy;
+                }
+            }
+            if (!empty($moyennes)) {
+                $moyClass = round(array_sum($moyennes) / count($moyennes), 2);
+                $moyennesParMatiere[$matiere->id] = $moyClass;
+                $coeff = (float) ($matiere->coefficient ?? 1);
+                $totalPts   += $moyClass * $coeff;
+                $totalCoeff += $coeff;
+            }
+        }
+
+        return [
+            'par_matiere' => $moyennesParMatiere,
+            'generale'    => $totalCoeff > 0 ? round($totalPts / $totalCoeff, 2) : 0.0,
+        ];
+    }
+
     private function mention(float $note): string
     {
         if ($note >= 16) return 'Très Bien';
@@ -347,7 +406,7 @@ class NoteController extends Controller
         return view('notes.bulletin', compact(
             'etudiant', 'notesExamen', 'notesDevoir', 'notesComposition',
             'moyenne', 'lignesMatiere', 'moyennePonderee', 'totalCoefficient',
-            'rang', 'anneeScolaire', 'trimestre', 'etablissement'
+            'rang', 'anneeScolaire', 'trimestre', 'etablissement', 'moyenneGeneraleClasse'
         ));
     }
 
@@ -372,7 +431,7 @@ class NoteController extends Controller
         $pdf = Pdf::loadView('bulletins.pdf.bulletin', compact(
             'etudiant', 'notesExamen', 'notesDevoir', 'notesComposition',
             'moyenne', 'lignesMatiere', 'moyennePonderee', 'totalCoefficient',
-            'rang', 'anneeScolaire', 'trimestre', 'etablissement'
+            'rang', 'anneeScolaire', 'trimestre', 'etablissement', 'moyenneGeneraleClasse'
         ))->setPaper('a4', 'portrait');
 
         return $pdf->download('bulletin_' . $etudiant->matricule . '_' . $trimestre . '.pdf');
@@ -399,7 +458,7 @@ class NoteController extends Controller
         $pdf = Pdf::loadView('bulletins.pdf.bulletin', compact(
             'etudiant', 'notesExamen', 'notesDevoir', 'notesComposition',
             'moyenne', 'lignesMatiere', 'moyennePonderee', 'totalCoefficient',
-            'rang', 'anneeScolaire', 'trimestre', 'etablissement'
+            'rang', 'anneeScolaire', 'trimestre', 'etablissement', 'moyenneGeneraleClasse'
         ))->setPaper('a4', 'portrait');
 
         return $pdf->stream('bulletin_' . $etudiant->matricule . '_' . $trimestre . '.pdf');
@@ -473,9 +532,11 @@ class NoteController extends Controller
             ->orderBy('nom')
             ->get();
 
+        $moyennesClasse = $this->calculerMoyennesClasse($classe->id, $anneeScolaire, $trimestre);
+
         $bulletins = [];
         foreach ($etudiants as $etudiant) {
-            $data = $this->chargerNotesBulletin($etudiant, $anneeScolaire, $trimestre);
+            $data = $this->chargerNotesBulletin($etudiant, $anneeScolaire, $trimestre, $moyennesClasse);
             $data['etudiant'] = $etudiant;
             $bulletins[] = $data;
         }

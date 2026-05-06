@@ -11,9 +11,11 @@ class PresenceController extends Controller
 {
     public function index(Request $request)
     {
-        $classes = Classe::orderBy('nom')->get();
-        $classeId = $request->classe_id ?? $classes->first()?->id;
-        $date = $request->date ?? today()->format('Y-m-d');
+        $classes  = Classe::orderBy('nom')->get();
+        $classeId = $request->filled('classe_id') ? (int) $request->classe_id : $classes->first()?->id;
+        $date     = ($request->filled('date') && \DateTime::createFromFormat('Y-m-d', $request->date))
+            ? $request->date
+            : today()->format('Y-m-d');
 
         $etudiants = Etudiant::where('classe_id', $classeId)
             ->where('statut', 'actif')

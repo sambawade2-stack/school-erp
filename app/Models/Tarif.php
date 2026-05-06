@@ -34,6 +34,6 @@ class Tarif extends Model
         'terminal'    => 'Terminal',
     ];
 
-    /** Types regroupés dans le bloc "Inscription" */
-    public const GROUPE_INSCRIPTION = ['premiere_mensualite', 'avance_juillet', 'tenues', 'assurance_maladie'];
+    /** Tout sauf mensualité est regroupé dans le bloc "Inscription" */
+    public const GROUPE_INSCRIPTION = ['premiere_mensualite', 'avance_juillet', 'tenues', 'assurance_maladie', 'inscription'];
 }

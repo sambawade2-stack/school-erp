@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Depense extends Model
 {
     protected $fillable = [
-        'libelle', 'montant', 'categorie', 'date_depense',
+        'type_mouvement', 'libelle', 'montant', 'categorie', 'date_depense',
         'annee_scolaire', 'beneficiaire', 'description',
     ];
 

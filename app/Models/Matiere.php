@@ -4,12 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Cache;
 
 class Matiere extends Model
 {
-    protected $fillable = ['nom', 'code', 'coefficient', 'niveau', 'enseignant_id', 'classe_id', 'section'];
+    protected $fillable = ['nom', 'code', 'coefficient', 'niveau', 'enseignant_id', 'section'];
 
     protected $casts = [
         'coefficient' => 'decimal:2',
@@ -20,9 +21,9 @@ class Matiere extends Model
         return $this->belongsTo(Enseignant::class);
     }
 
-    public function classe(): BelongsTo
+    public function classes(): BelongsToMany
     {
-        return $this->belongsTo(Classe::class, 'classe_id');
+        return $this->belongsToMany(Classe::class, 'classe_matiere');
     }
 
     public function examens(): HasMany
@@ -52,9 +53,13 @@ class Matiere extends Model
      *
      * @return float  Moyenne pondérée sur 20
      */
-    public function moyenneEtudiant(int $etudiantId, string $anneeScolaire, string $trimestre): float
+    public function moyenneEtudiant(int $etudiantId, string $anneeScolaire, string $trimestre, string $categorie = null): float
     {
-        $categorie = $this->classe?->categorie ?? 'college';
+        $categorie ??= Cache::remember(
+            "etudiant_categorie_{$etudiantId}",
+            300,
+            fn() => \App\Models\Etudiant::with('classe')->find($etudiantId)?->classe?->categorie ?? 'college'
+        );
 
         // ── ÉLÉMENTAIRE : composition uniquement ─────────────────────────────
         if ($categorie === 'elementaire') {

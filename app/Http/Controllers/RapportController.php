@@ -41,6 +41,11 @@ class RapportController extends Controller
 
     public function paiements(Request $request)
     {
+        $request->validate([
+            'debut' => 'nullable|date_format:Y-m-d',
+            'fin'   => 'nullable|date_format:Y-m-d',
+        ]);
+
         $debut = $request->debut ?? now()->startOfMonth()->format('Y-m-d');
         $fin   = $request->fin   ?? now()->format('Y-m-d');
 
@@ -61,6 +66,12 @@ class RapportController extends Controller
 
     public function presences(Request $request)
     {
+        $request->validate([
+            'classe_id' => 'nullable|integer|exists:classes,id',
+            'debut'     => 'nullable|date_format:Y-m-d',
+            'fin'       => 'nullable|date_format:Y-m-d',
+        ]);
+
         $classes = Classe::orderBy('nom')->get();
         $classeId = $request->classe_id;
         $debut = $request->debut ?? now()->startOfMonth()->format('Y-m-d');

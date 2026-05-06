@@ -46,7 +46,13 @@
                 @foreach($enseignant->matieres as $matiere)
                 <div class="flex items-center justify-between py-2 border-b border-gray-50">
                     <span class="font-medium text-gray-700">{{ $matiere->nom }}</span>
-                    <span class="text-sm text-gray-500">{{ $matiere->classe?->nom ?? '—' }}</span>
+                    <span class="text-sm text-gray-500">
+                        @if($matiere->classes->isNotEmpty())
+                            {{ $matiere->classes->pluck('nom')->join(', ') }}
+                        @else
+                            <span class="italic text-gray-300">Toutes classes</span>
+                        @endif
+                    </span>
                     <span class="text-xs text-gray-400">Coef. {{ $matiere->coefficient }}</span>
                 </div>
                 @endforeach

@@ -35,8 +35,9 @@ class EtudiantController extends Controller
             'adresse'          => 'nullable|string|max:500',
             'date_inscription' => 'required|date',
             'statut'           => $isUpdate ? 'sometimes|in:actif,inactif,archive' : 'prohibited',
+            'regime_paiement'  => 'sometimes|in:plein_tarif,demi_tarif',
             'photo'            => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
-            'photo_webcam'     => ['nullable', 'string', 'regex:/^data:image\/(jpeg|png|jpg);base64,/'],
+            'photo_webcam'     => ['nullable', 'string', 'regex:/^data:image\/(jpeg|jpg|png);base64,[A-Za-z0-9+\/]+=*$/'],
         ];
     }
 
@@ -48,6 +49,7 @@ class EtudiantController extends Controller
         $champs = [
             'prenom', 'nom', 'sexe', 'date_naissance', 'classe_id',
             'telephone', 'adresse', 'nom_parent', 'tel_parent', 'date_inscription',
+            'regime_paiement',
         ];
         if ($isUpdate) {
             $champs[] = 'statut';
@@ -422,11 +424,16 @@ class EtudiantController extends Controller
 
     private function sauvegarderPhotoBase64(string $base64): string
     {
-        $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $base64);
-        $imageData = base64_decode($imageData);
+        $imageData = preg_replace('/^data:image\/(jpeg|jpg|png);base64,/', '', $base64);
+        $imageData = base64_decode($imageData, true);
 
-        if ($imageData === false) {
-            abort(422, 'Données photo webcam invalides.');
+        if ($imageData === false || strlen($imageData) > 5 * 1024 * 1024) {
+            abort(422, 'Image webcam invalide ou trop volumineuse.');
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($imageData);
+        if (!in_array($mime, ['image/jpeg', 'image/png'], true)) {
+            abort(422, 'Type de fichier non autorisé.');
         }
 
         $nomFichier = 'etudiant_' . bin2hex(random_bytes(12)) . '.jpg';

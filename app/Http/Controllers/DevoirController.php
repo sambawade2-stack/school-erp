@@ -26,7 +26,7 @@ class DevoirController extends Controller
     public function create()
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('devoirs.create', compact('classes', 'matieres'));
     }
 
@@ -59,7 +59,7 @@ class DevoirController extends Controller
     public function edit(Devoir $devoir)
     {
         $classes  = Classe::orderBy('nom')->get();
-        $matieres = Matiere::with('classe')->orderBy('nom')->get();
+        $matieres = Matiere::with('classes')->orderBy('nom')->get();
         return view('devoirs.edit', compact('devoir', 'classes', 'matieres'));
     }
 

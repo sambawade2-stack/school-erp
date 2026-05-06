@@ -93,7 +93,12 @@
                     <p class="text-sm text-gray-500">Classe : {{ $etudiant->classe?->nom ?? '—' }} | {{ $anneeScolaire }} | {{ $trimestre }}</p>
                     @if($moyenne > 0)
                     <p class="text-sm font-semibold {{ $moyenne >= 10 ? 'text-green-600' : 'text-red-500' }} mt-1">
-                        Moyenne generale : {{ number_format($moyenne, 2) }}/20
+                        Moyenne générale : {{ number_format($moyennePonderee ?? $moyenne, 2) }}/20
+                    </p>
+                    @endif
+                    @if(isset($moyenneGeneraleClasse) && $moyenneGeneraleClasse > 0)
+                    <p class="text-sm text-gray-500 mt-0.5">
+                        Moyenne de la classe : <span class="font-semibold text-gray-700">{{ number_format($moyenneGeneraleClasse, 2) }}/20</span>
                     </p>
                     @endif
                 </div>

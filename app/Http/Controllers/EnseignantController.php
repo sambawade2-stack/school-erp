@@ -49,6 +49,7 @@ class EnseignantController extends Controller
             'specialite'    => 'nullable|string|max:100',
             'date_embauche' => 'nullable|date',
             'photo'         => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
+            'photo_webcam'  => ['nullable', 'string', 'regex:/^data:image\/(jpeg|jpg|png);base64,[A-Za-z0-9+\/]+=*$/'],
         ]);
 
         $data = $request->except(['photo', 'photo_webcam']);
@@ -87,6 +88,7 @@ class EnseignantController extends Controller
             'specialite'    => 'nullable|string|max:100',
             'date_embauche' => 'nullable|date',
             'photo'         => 'nullable|image|mimes:jpeg,jpg,png|max:2048',
+            'photo_webcam'  => ['nullable', 'string', 'regex:/^data:image\/(jpeg|jpg|png);base64,[A-Za-z0-9+\/]+=*$/'],
         ]);
 
         $data = $request->except(['photo', 'photo_webcam']);
@@ -194,8 +196,17 @@ class EnseignantController extends Controller
 
     private function sauvegarderPhotoBase64(string $base64): string
     {
-        $imageData = preg_replace('/^data:image\/\w+;base64,/', '', $base64);
-        $imageData = base64_decode($imageData);
+        $imageData = preg_replace('/^data:image\/(jpeg|jpg|png);base64,/', '', $base64);
+        $imageData = base64_decode($imageData, true);
+
+        if ($imageData === false || strlen($imageData) > 5 * 1024 * 1024) {
+            abort(422, 'Image webcam invalide ou trop volumineuse.');
+        }
+
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($imageData);
+        if (!in_array($mime, ['image/jpeg', 'image/png'], true)) {
+            abort(422, 'Type de fichier non autorisé.');
+        }
 
         $nomFichier = 'enseignant_' . bin2hex(random_bytes(8)) . '.jpg';
         $chemin = storage_path("app/public/enseignants/{$nomFichier}");
