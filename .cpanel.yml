@@ -1,0 +1,9 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/darabounno/school-erp
+    - cd $DEPLOYPATH && php artisan config:clear
+    - cd $DEPLOYPATH && php artisan route:clear
+    - cd $DEPLOYPATH && php artisan view:clear
+    - cd $DEPLOYPATH && php artisan cache:clear
+    - cd $DEPLOYPATH && php artisan migrate --force
