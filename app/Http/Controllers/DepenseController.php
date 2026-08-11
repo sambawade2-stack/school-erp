@@ -46,7 +46,15 @@ class DepenseController extends Controller
         $totalDepensesMois  = (clone $statsQuery)->where('type_mouvement', 'depense')->sum('montant');
         $totalDepotsMois    = (clone $statsQuery)->where('type_mouvement', 'depot_banque')->sum('montant');
         $totalRetraitsMois  = (clone $statsQuery)->where('type_mouvement', 'retrait_banque')->sum('montant');
-        $totalAnnee         = Depense::whereYear('date_depense', $anneeFiltre)->where('type_mouvement', 'depense')->sum('montant');
+        // Total annuel calculé sur l'année scolaire (à cheval sur deux années civiles),
+        // et non sur l'année civile : les dépenses de décembre restent comptabilisées.
+        $moisReference           = \Carbon\Carbon::create($anneeFiltre, $moisFiltre, 1);
+        [$debutAnnee, $finAnnee] = AnneeScolaire::bornesPourDate($moisReference);
+        $libelleAnneeScolaire    = AnneeScolaire::libellePourDate($moisReference);
+
+        $totalAnnee = Depense::whereBetween('date_depense', [$debutAnnee, $finAnnee])
+            ->where('type_mouvement', 'depense')
+            ->sum('montant');
 
         $totauxParCategorie = (clone $statsQuery)
             ->where('type_mouvement', 'depense')
@@ -59,7 +67,7 @@ class DepenseController extends Controller
         return view('depenses.index', compact(
             'depenses', 'totalAnnee', 'totauxParCategorie',
             'totalDepensesMois', 'totalDepotsMois', 'totalRetraitsMois',
-            'categories', 'moisFiltre', 'anneeFiltre'
+            'categories', 'moisFiltre', 'anneeFiltre', 'libelleAnneeScolaire'
         ));
     }
 

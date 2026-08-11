@@ -57,7 +57,7 @@
     <div class="rounded-xl p-4" style="background: #fef2f2; border: 1px solid #fecaca;">
         <p class="text-xs font-medium" style="color: #dc2626;">Dépenses annuelles</p>
         <p class="text-xl font-bold mt-1" style="color: #b91c1c;">{{ number_format($totalAnnee, 0, ',', ' ') }}</p>
-        <p class="text-xs mt-0.5" style="color: #dc2626; opacity: 0.7;">XOF {{ $anneeFiltre }}</p>
+        <p class="text-xs mt-0.5" style="color: #dc2626; opacity: 0.7;">XOF · année scolaire {{ $libelleAnneeScolaire }}</p>
     </div>
 </div>
 
