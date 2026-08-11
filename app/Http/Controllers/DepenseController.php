@@ -6,12 +6,16 @@ use App\Models\AnneeScolaire;
 use App\Models\Depense;
 use App\Models\Enseignant;
 use App\Models\Etablissement;
+use App\Traits\FiltrePeriodeScolaire;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DepenseController extends Controller
 {
+    use FiltrePeriodeScolaire;
+
     public function index(Request $request)
     {
         $query = Depense::query();
@@ -32,29 +36,32 @@ class DepenseController extends Controller
             $query->where('type_mouvement', $request->type_mouvement);
         }
 
-        $moisFiltre  = $request->filled('mois')  ? max(1, min(12, (int) $request->mois))   : now()->month;
-        $anneeFiltre = $request->filled('annee') ? max(2000, min(2100, (int) $request->annee)) : now()->year;
+        [$moisFiltre, $anneeFiltre, $toutMois] = $this->periodeDemandee($request);
 
-        $query->whereMonth('date_depense', $moisFiltre)
-              ->whereYear('date_depense', $anneeFiltre);
+        // Bornes de l'année scolaire (à cheval sur deux années civiles) contenant le mois affiché.
+        $moisReference           = Carbon::create($anneeFiltre, $moisFiltre, 1);
+        [$debutAnnee, $finAnnee] = AnneeScolaire::bornesPourDate($moisReference);
+        $libelleAnneeScolaire    = AnneeScolaire::libellePourDate($moisReference);
+
+        $this->filtrerSurPeriode($query, 'date_depense', $moisFiltre, $anneeFiltre, $toutMois);
 
         $depenses = $query->orderByDesc('date_depense')->paginate(20)->withQueryString();
 
-        $statsQuery = Depense::whereMonth('date_depense', $moisFiltre)
-            ->whereYear('date_depense', $anneeFiltre);
+        $statsQuery = $this->filtrerSurPeriode(Depense::query(), 'date_depense', $moisFiltre, $anneeFiltre, $toutMois);
 
         $totalDepensesMois  = (clone $statsQuery)->where('type_mouvement', 'depense')->sum('montant');
         $totalDepotsMois    = (clone $statsQuery)->where('type_mouvement', 'depot_banque')->sum('montant');
         $totalRetraitsMois  = (clone $statsQuery)->where('type_mouvement', 'retrait_banque')->sum('montant');
-        // Total annuel calculé sur l'année scolaire (à cheval sur deux années civiles),
-        // et non sur l'année civile : les dépenses de décembre restent comptabilisées.
-        $moisReference           = \Carbon\Carbon::create($anneeFiltre, $moisFiltre, 1);
-        [$debutAnnee, $finAnnee] = AnneeScolaire::bornesPourDate($moisReference);
-        $libelleAnneeScolaire    = AnneeScolaire::libellePourDate($moisReference);
 
+        // Total annuel calculé sur l'année scolaire, et non sur l'année civile :
+        // les dépenses de décembre restent comptabilisées après le 1er janvier.
         $totalAnnee = Depense::whereBetween('date_depense', [$debutAnnee, $finAnnee])
             ->where('type_mouvement', 'depense')
             ->sum('montant');
+
+        // Périodes sélectionnables, groupées par année scolaire (décembre inclus).
+        $periodeSelectionne = $toutMois ? $libelleAnneeScolaire : sprintf('%04d-%02d', $anneeFiltre, $moisFiltre);
+        $moisParAnnee       = $this->optionsPeriodeScolaire($debutAnnee, $finAnnee, $libelleAnneeScolaire, $periodeSelectionne);
 
         $totauxParCategorie = (clone $statsQuery)
             ->where('type_mouvement', 'depense')
@@ -67,7 +74,8 @@ class DepenseController extends Controller
         return view('depenses.index', compact(
             'depenses', 'totalAnnee', 'totauxParCategorie',
             'totalDepensesMois', 'totalDepotsMois', 'totalRetraitsMois',
-            'categories', 'moisFiltre', 'anneeFiltre', 'libelleAnneeScolaire'
+            'categories', 'moisFiltre', 'anneeFiltre', 'libelleAnneeScolaire',
+            'toutMois', 'moisParAnnee', 'periodeSelectionne'
         ));
     }
 
@@ -151,10 +159,9 @@ class DepenseController extends Controller
     public function exportPdf(Request $request)
     {
         $query = Depense::query();
-        $mois  = $request->filled('mois')  ? max(1, min(12, (int) $request->mois))      : now()->month;
-        $annee = $request->filled('annee') ? max(2000, min(2100, (int) $request->annee)) : now()->year;
+        [$mois, $annee, $toutMois] = $this->periodeDemandee($request);
 
-        $query->whereMonth('date_depense', $mois)->whereYear('date_depense', $annee);
+        $this->filtrerSurPeriode($query, 'date_depense', $mois, $annee, $toutMois);
 
         if ($request->filled('type_mouvement')) {
             $query->where('type_mouvement', $request->type_mouvement);
@@ -167,21 +174,25 @@ class DepenseController extends Controller
         $depenses = $query->orderByDesc('date_depense')->get();
         $total = $depenses->sum('montant');
         $etablissement = Etablissement::first();
-        $periode = \Carbon\Carbon::create($annee, $mois, 1)->locale('fr')->translatedFormat('F Y');
+        $libelleAnnee = AnneeScolaire::libellePourDate(Carbon::create($annee, $mois, 1));
+        $periode      = $toutMois
+            ? 'Année scolaire ' . $libelleAnnee
+            : Carbon::create($annee, $mois, 1)->locale('fr')->translatedFormat('F Y');
 
         $pdf = Pdf::loadView('exports.depenses-pdf', compact('depenses', 'total', 'etablissement', 'periode'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('depenses_' . $mois . '_' . $annee . '.pdf');
+        $suffixe = $this->suffixeFichierPeriode($mois, $annee, $toutMois);
+
+        return $pdf->download('depenses_' . $suffixe . '.pdf');
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $query = Depense::query();
-        $mois  = $request->filled('mois')  ? max(1, min(12, (int) $request->mois))      : now()->month;
-        $annee = $request->filled('annee') ? max(2000, min(2100, (int) $request->annee)) : now()->year;
+        [$mois, $annee, $toutMois] = $this->periodeDemandee($request);
 
-        $query->whereMonth('date_depense', $mois)->whereYear('date_depense', $annee);
+        $this->filtrerSurPeriode($query, 'date_depense', $mois, $annee, $toutMois);
 
         if ($request->filled('type_mouvement')) {
             $query->where('type_mouvement', $request->type_mouvement);
@@ -206,6 +217,6 @@ class DepenseController extends Controller
                 ], ';');
             }
             fclose($handle);
-        }, 'depenses_' . $mois . '_' . $annee . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, 'depenses_' . $this->suffixeFichierPeriode($mois, $annee, $toutMois) . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 }

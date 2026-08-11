@@ -14,17 +14,26 @@
         'autre'         => ['label' => 'Autre',         'color' => '#6b7280', 'bg' => '#f9fafb', 'border' => '#e5e7eb'],
     ];
     $moisNomFiltre = \Carbon\Carbon::create($anneeFiltre, $moisFiltre, 1)->locale('fr')->translatedFormat('F Y');
+    $elision       = in_array(mb_substr($moisNomFiltre, 0, 1), ['a', 'e', 'i', 'o', 'u', 'â', 'é', 'ô']) ? "d'" : 'de ';
+    $titrePeriode  = $toutMois ? "de l'année scolaire {$libelleAnneeScolaire}" : "du mois {$elision}{$moisNomFiltre}";
+    $libellePeriode = $toutMois ? "de l'année" : 'du mois';
+    $suffixePeriode = $toutMois ? "sur l'année scolaire" : 'ce mois';
+    $paramsPeriode = array_filter([
+        'periode'        => $periodeSelectionne,
+        'categorie'      => request('categorie'),
+        'type_mouvement' => request('type_mouvement'),
+    ]);
 @endphp
 
 <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-    <h2 class="text-lg font-semibold text-gray-700">Dépenses du mois de {{ $moisNomFiltre }}</h2>
+    <h2 class="text-lg font-semibold text-gray-700">Dépenses {{ $titrePeriode }}</h2>
     <div class="flex items-center gap-2">
-        <a href="{{ route('depenses.export.pdf', array_filter(['mois' => $moisFiltre, 'annee' => $anneeFiltre, 'categorie' => request('categorie'), 'type_mouvement' => request('type_mouvement')])) }}"
+        <a href="{{ route('depenses.export.pdf', $paramsPeriode) }}"
            class="flex items-center gap-1.5 px-3 py-2 text-white rounded-lg text-sm font-medium transition-colors" style="background:#dc2626;" onmouseover="this.style.backgroundColor='#b91c1c'" onmouseout="this.style.backgroundColor='#dc2626'">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             PDF
         </a>
-        <a href="{{ route('depenses.export.csv', array_filter(['mois' => $moisFiltre, 'annee' => $anneeFiltre, 'categorie' => request('categorie'), 'type_mouvement' => request('type_mouvement')])) }}"
+        <a href="{{ route('depenses.export.csv', $paramsPeriode) }}"
            class="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             CSV
@@ -40,19 +49,19 @@
 {{-- Stats mouvements banque + dépenses --}}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
     <div class="rounded-xl p-4" style="background: #fef2f2; border: 1px solid #fecaca;">
-        <p class="text-xs font-medium" style="color: #dc2626;">Dépenses du mois</p>
+        <p class="text-xs font-medium" style="color: #dc2626;">Dépenses {{ $libellePeriode }}</p>
         <p class="text-xl font-bold mt-1" style="color: #b91c1c;">{{ number_format($totalDepensesMois, 0, ',', ' ') }}</p>
         <p class="text-xs mt-0.5" style="color: #dc2626; opacity: 0.7;">XOF</p>
     </div>
     <div class="rounded-xl p-4" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
         <p class="text-xs font-medium" style="color: #16a34a;">Dépôts bancaires</p>
         <p class="text-xl font-bold mt-1" style="color: #15803d;">{{ number_format($totalDepotsMois, 0, ',', ' ') }}</p>
-        <p class="text-xs mt-0.5" style="color: #16a34a; opacity: 0.7;">XOF ce mois</p>
+        <p class="text-xs mt-0.5" style="color: #16a34a; opacity: 0.7;">XOF {{ $suffixePeriode }}</p>
     </div>
     <div class="rounded-xl p-4" style="background: #fffbeb; border: 1px solid #fde68a;">
         <p class="text-xs font-medium" style="color: #d97706;">Retraits bancaires</p>
         <p class="text-xl font-bold mt-1" style="color: #b45309;">{{ number_format($totalRetraitsMois, 0, ',', ' ') }}</p>
-        <p class="text-xs mt-0.5" style="color: #d97706; opacity: 0.7;">XOF ce mois</p>
+        <p class="text-xs mt-0.5" style="color: #d97706; opacity: 0.7;">XOF {{ $suffixePeriode }}</p>
     </div>
     <div class="rounded-xl p-4" style="background: #fef2f2; border: 1px solid #fecaca;">
         <p class="text-xs font-medium" style="color: #dc2626;">Dépenses annuelles</p>
@@ -91,14 +100,20 @@
             <option value="{{ $key }}" {{ request('categorie') === $key ? 'selected' : '' }}>{{ $info['label'] }}</option>
             @endforeach
         </select>
-        <select name="mois" class="border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" style="min-width:160px;">
-            <option value="">Tous les mois</option>
-            @for($m = 1; $m <= now()->month; $m++)
-            <option value="{{ $m }}" {{ request('mois') == $m ? 'selected' : '' }}>{{ \Carbon\Carbon::create()->month($m)->locale('fr')->translatedFormat('F') }}</option>
-            @endfor
+        <select name="periode" class="border border-gray-200 rounded-lg px-4 py-2.5 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none" style="min-width:210px;">
+            @foreach($moisParAnnee as $groupe)
+            <optgroup label="{{ $groupe['valeur_annee'] ? 'Année scolaire ' . $groupe['libelle'] : $groupe['libelle'] }}">
+                @if($groupe['valeur_annee'])
+                <option value="{{ $groupe['valeur_annee'] }}" {{ $periodeSelectionne === $groupe['valeur_annee'] ? 'selected' : '' }}>Toute l'année {{ $groupe['libelle'] }}</option>
+                @endif
+                @foreach($groupe['mois'] as $mois)
+                <option value="{{ $mois['valeur'] }}" {{ $periodeSelectionne === $mois['valeur'] ? 'selected' : '' }}>{{ $mois['label'] }}</option>
+                @endforeach
+            </optgroup>
+            @endforeach
         </select>
         <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Filtrer</button>
-        @if(request()->hasAny(['recherche', 'categorie', 'mois', 'type_mouvement']))
+        @if(request()->hasAny(['recherche', 'categorie', 'periode', 'mois', 'type_mouvement']))
         <a href="{{ route('depenses.index') }}" class="px-4 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-100">Effacer</a>
         @endif
     </form>
