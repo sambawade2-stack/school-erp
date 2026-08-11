@@ -8,12 +8,16 @@ use App\Models\Etudiant;
 use App\Models\Inscription;
 use App\Models\Paiement;
 use App\Models\Tarif;
+use App\Traits\FiltrePeriodeScolaire;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PaiementController extends Controller
 {
+    use FiltrePeriodeScolaire;
+
     public function index(Request $request)
     {
         $query = Paiement::with('etudiant');
@@ -33,23 +37,30 @@ class PaiementController extends Controller
             }
         }
 
-        if ($request->filled('mois')) {
-            $query->whereMonth('date_paiement', $request->mois)
-                  ->whereYear('date_paiement', $request->annee ?? now()->year);
-        }
+        // Par défaut, on affiche toute l'année scolaire en cours.
+        [$moisFiltre, $anneeFiltre, $toutMois] = $this->periodeDemandee($request, defautAnneeComplete: true);
+
+        // Bornes de l'année scolaire (à cheval sur deux années civiles) contenant le mois affiché.
+        $moisReference           = Carbon::create($anneeFiltre, $moisFiltre, 1);
+        [$debutAnnee, $finAnnee] = AnneeScolaire::bornesPourDate($moisReference);
+        $libelleAnneeScolaire    = AnneeScolaire::libellePourDate($moisReference);
+
+        $this->filtrerSurPeriode($query, 'date_paiement', $moisFiltre, $anneeFiltre, $toutMois);
 
         $paiements = $query->orderByDesc('date_paiement')->paginate(20)->withQueryString();
 
-        // Construire la requête de stats selon les filtres actifs
-        $statsQuery = Paiement::query();
-        $moisFiltre = $request->filled('mois') ? (int) $request->mois : now()->month;
-        $anneeFiltre = $request->filled('annee') ? (int) $request->annee : now()->year;
-
-        $statsQuery->whereMonth('date_paiement', $moisFiltre)
-                   ->whereYear('date_paiement', $anneeFiltre);
+        // Stats calées sur la période affichée
+        $statsQuery = $this->filtrerSurPeriode(Paiement::query(), 'date_paiement', $moisFiltre, $anneeFiltre, $toutMois);
 
         $totalFiltre = (clone $statsQuery)->sum('montant');
-        $totalAnnee  = Paiement::whereYear('date_paiement', $anneeFiltre)->sum('montant');
+
+        // Total annuel calculé sur l'année scolaire, et non sur l'année civile :
+        // les paiements de décembre restent comptabilisés après le 1er janvier.
+        $totalAnnee = Paiement::whereBetween('date_paiement', [$debutAnnee, $finAnnee])->sum('montant');
+
+        // Périodes sélectionnables, groupées par année scolaire (décembre inclus).
+        $periodeSelectionne = $toutMois ? $libelleAnneeScolaire : sprintf('%04d-%02d', $anneeFiltre, $moisFiltre);
+        $moisParAnnee       = $this->optionsPeriodeScolaire($debutAnnee, $finAnnee, $libelleAnneeScolaire, $periodeSelectionne);
 
         $totauxParType = (clone $statsQuery)
             ->selectRaw("type_paiement, SUM(montant) as total")
@@ -67,7 +78,8 @@ class PaiementController extends Controller
         return view('paiements.index', compact(
             'paiements', 'totalFiltre', 'totalAnnee', 'totauxParType',
             'moisFiltre', 'anneeFiltre', 'typesFrais', 'typeColors',
-            'totalInscription'
+            'totalInscription', 'libelleAnneeScolaire', 'toutMois',
+            'moisParAnnee', 'periodeSelectionne'
         ));
     }
 
@@ -291,10 +303,9 @@ class PaiementController extends Controller
     public function exportPdf(Request $request)
     {
         $query = Paiement::with('etudiant');
-        $mois = $request->filled('mois') ? (int) $request->mois : now()->month;
-        $annee = $request->filled('annee') ? (int) $request->annee : now()->year;
+        [$mois, $annee, $toutMois] = $this->periodeDemandee($request, defautAnneeComplete: true);
 
-        $query->whereMonth('date_paiement', $mois)->whereYear('date_paiement', $annee);
+        $this->filtrerSurPeriode($query, 'date_paiement', $mois, $annee, $toutMois);
 
         if ($request->filled('type')) {
             $query->where('type_paiement', $request->type);
@@ -303,21 +314,23 @@ class PaiementController extends Controller
         $paiements = $query->orderByDesc('date_paiement')->get();
         $total = $paiements->sum('montant');
         $etablissement = Etablissement::first();
-        $periode = \Carbon\Carbon::create($annee, $mois, 1)->locale('fr')->translatedFormat('F Y');
+        $libelleAnnee = AnneeScolaire::libellePourDate(Carbon::create($annee, $mois, 1));
+        $periode      = $toutMois
+            ? 'Année scolaire ' . $libelleAnnee
+            : Carbon::create($annee, $mois, 1)->locale('fr')->translatedFormat('F Y');
 
         $pdf = Pdf::loadView('exports.paiements-pdf', compact('paiements', 'total', 'etablissement', 'periode'))
             ->setPaper('a4', 'landscape');
 
-        return $pdf->download('paiements_' . $mois . '_' . $annee . '.pdf');
+        return $pdf->download('paiements_' . $this->suffixeFichierPeriode($mois, $annee, $toutMois) . '.pdf');
     }
 
     public function exportCsv(Request $request): StreamedResponse
     {
         $query = Paiement::with('etudiant');
-        $mois = $request->filled('mois') ? (int) $request->mois : now()->month;
-        $annee = $request->filled('annee') ? (int) $request->annee : now()->year;
+        [$mois, $annee, $toutMois] = $this->periodeDemandee($request, defautAnneeComplete: true);
 
-        $query->whereMonth('date_paiement', $mois)->whereYear('date_paiement', $annee);
+        $this->filtrerSurPeriode($query, 'date_paiement', $mois, $annee, $toutMois);
 
         if ($request->filled('type')) {
             $query->where('type_paiement', $request->type);
@@ -337,7 +350,7 @@ class PaiementController extends Controller
                 ], ';');
             }
             fclose($handle);
-        }, 'paiements_' . $mois . '_' . $annee . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, 'paiements_' . $this->suffixeFichierPeriode($mois, $annee, $toutMois) . '.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function genererNumeroRecu(): string

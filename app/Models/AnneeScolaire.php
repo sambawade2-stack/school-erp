@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 class AnneeScolaire extends Model
@@ -42,6 +43,54 @@ class AnneeScolaire extends Model
     public static function trimestreActif(): string
     {
         return static::active()?->trimestre_actuel ?? 'T1';
+    }
+
+    /**
+     * Année scolaire couvrant une date donnée : une année scolaire étant à cheval
+     * sur deux années civiles, décembre 2025 appartient par exemple à 2025-2026.
+     */
+    public static function pourDate($date): ?self
+    {
+        $jour = $date instanceof Carbon ? $date->copy() : Carbon::parse($date);
+
+        return static::whereNotNull('date_debut')
+            ->whereNotNull('date_fin')
+            ->whereDate('date_debut', '<=', $jour)
+            ->whereDate('date_fin', '>=', $jour)
+            ->orderByDesc('date_debut')
+            ->first();
+    }
+
+    /**
+     * Bornes [début, fin] de l'année scolaire couvrant une date.
+     * Si aucune année enregistrée ne couvre la date, on retombe sur une année type
+     * démarrant au mois de rentrée de l'année active (septembre par défaut).
+     */
+    public static function bornesPourDate($date): array
+    {
+        $jour = $date instanceof Carbon ? $date->copy() : Carbon::parse($date);
+
+        if ($annee = static::pourDate($jour)) {
+            return [$annee->date_debut->copy()->startOfDay(), $annee->date_fin->copy()->endOfDay()];
+        }
+
+        $moisRentree = static::active()?->date_debut?->month ?? 9;
+        $anneeDebut  = $jour->month >= $moisRentree ? $jour->year : $jour->year - 1;
+        $debut       = Carbon::create($anneeDebut, $moisRentree, 1)->startOfDay();
+
+        return [$debut, $debut->copy()->addYear()->subDay()->endOfDay()];
+    }
+
+    /** Libellé de l'année scolaire couvrant une date (ex : "2025-2026"). */
+    public static function libellePourDate($date): string
+    {
+        if ($annee = static::pourDate($date)) {
+            return $annee->libelle;
+        }
+
+        [$debut, $fin] = static::bornesPourDate($date);
+
+        return $debut->year . '-' . $fin->year;
     }
 
     /**
